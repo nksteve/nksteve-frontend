@@ -99,3 +99,5 @@ export const updateTrainingCategory = (data) => http.post('/trainingCategory', d
 
 // Preferences
 export const updatePreferences = (data) => http.post('/preferences', data);
+
+export const getMyPlans = (data) => http.post('/getMyPlans', data);
