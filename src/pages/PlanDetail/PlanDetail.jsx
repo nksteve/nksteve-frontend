@@ -3,8 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import { ArrowLeft, Target, Users, Video, FileText, Zap, Activity, Plus, X, ChevronDown, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 import * as api from '../../api/client';
 import useAuthStore from '../../store/authStore';
 
