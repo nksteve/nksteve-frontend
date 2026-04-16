@@ -142,9 +142,11 @@ export default function PlanDetail() {
     onError: () => toast.error('Failed to add note'),
   });
 
-  const plan = planQuery.data?.growthPlan || {};
-  const goals = planQuery.data?.goals || [];
-  const actions = planQuery.data?.actions || [];
+  // growthPlan is now a structured object (not an array)
+  const rawData = planQuery.data || {};
+  const plan = Array.isArray(rawData.growthPlan) ? (rawData.growthPlan[0] || {}) : (rawData.growthPlan || {});
+  const goals = rawData.goals || [];
+  const actions = rawData.actions || [];
 
   if (planQuery.isLoading) return <div style={{ padding: 32 }}><Spinner /></div>;
   if (planQuery.isError) return (

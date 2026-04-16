@@ -107,7 +107,7 @@ function BioTab({ entityId, queryClient }) {
   const { data: bio, isLoading } = useQuery({
     queryKey: ['bio', entityId],
     queryFn: () => api.getEntityBio(entityId),
-    select: (res) => res.data?.bio || res.data?.bioContent || '',
+    select: (res) => res.data?.bio?.summary ?? res.data?.bio ?? res.data?.bioContent ?? '',
     enabled: !!entityId,
     onSuccess: (data) => setBioContent(data),
   });

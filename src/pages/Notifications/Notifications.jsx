@@ -56,7 +56,7 @@ export default function Notifications() {
 
   const { data: notifications = [], isLoading, isError } = useQuery({
     queryKey: ['notifications', entityId, companyId],
-    queryFn: () => api.getNotifications({ entityId, companyId, action: 'GET' }),
+    queryFn: () => api.getNotifications({ entityId, companyId }),
     select: (res) => res.data?.notifications || res.data?.result || [],
     enabled: !!entityId,
   });
