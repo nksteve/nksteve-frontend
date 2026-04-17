@@ -99,16 +99,16 @@ function Speedometer({ percent = 0 }) {
   );
 }
 
-/* ─── Header toolbar icons (vembu: clipboard, link, bar-chart, palette, print, stack, fire, person) ── */
+/* ─── Header toolbar icons — 17px to match vembu FA icon sizes ───────────────── */
 const TOOLBAR_ICONS = [
-  { title: 'Notes',   svg: <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}><rect x={5} y={2} width={14} height={20} rx={2}/><line x1={9} y1={7} x2={15} y2={7}/><line x1={9} y1={11} x2={15} y2={11}/><line x1={9} y1={15} x2={12} y2={15}/></svg> },
-  { title: 'Link',    svg: <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> },
-  { title: 'Chart',   svg: <BarChart2 size={15} /> },
-  { title: 'Palette', svg: <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}><circle cx={12} cy={12} r={10}/><circle cx={8} cy={14} r={1} fill="currentColor"/><circle cx={12} cy={8} r={1} fill="currentColor"/><circle cx={16} cy={14} r={1} fill="currentColor"/></svg> },
-  { title: 'Print',   svg: <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x={6} y={14} width={12} height={8}/></svg> },
-  { title: 'Stack',   svg: <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}><rect x={2} y={3}  width={20} height={4} rx={1}/><rect x={2} y={10} width={20} height={4} rx={1}/><rect x={2} y={17} width={20} height={4} rx={1}/></svg> },
-  { title: 'Fire',    svg: <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg> },
-  { title: 'Users',   svg: <Users size={15} /> },
+  { title: 'Notes',   svg: <svg viewBox="0 0 24 24" width={17} height={17} fill="none" stroke="currentColor" strokeWidth={2}><rect x={5} y={2} width={14} height={20} rx={2}/><line x1={9} y1={7} x2={15} y2={7}/><line x1={9} y1={11} x2={15} y2={11}/><line x1={9} y1={15} x2={12} y2={15}/></svg> },
+  { title: 'Link',    svg: <svg viewBox="0 0 24 24" width={17} height={17} fill="none" stroke="currentColor" strokeWidth={2}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> },
+  { title: 'Chart',   svg: <BarChart2 size={17} /> },
+  { title: 'Palette', svg: <svg viewBox="0 0 24 24" width={17} height={17} fill="none" stroke="currentColor" strokeWidth={2}><circle cx={12} cy={12} r={10}/><circle cx={8} cy={14} r={1} fill="currentColor"/><circle cx={12} cy={8} r={1} fill="currentColor"/><circle cx={16} cy={14} r={1} fill="currentColor"/></svg> },
+  { title: 'Print',   svg: <svg viewBox="0 0 24 24" width={17} height={17} fill="none" stroke="currentColor" strokeWidth={2}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x={6} y={14} width={12} height={8}/></svg> },
+  { title: 'Stack',   svg: <svg viewBox="0 0 24 24" width={17} height={17} fill="none" stroke="currentColor" strokeWidth={2}><rect x={2} y={3}  width={20} height={4} rx={1}/><rect x={2} y={10} width={20} height={4} rx={1}/><rect x={2} y={17} width={20} height={4} rx={1}/></svg> },
+  { title: 'Fire',    svg: <svg viewBox="0 0 24 24" width={17} height={17} fill="none" stroke="currentColor" strokeWidth={2}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg> },
+  { title: 'Users',   svg: <Users size={17} /> },
 ];
 
 /* ─── Goal progress bar — matches vembu: colored fill + 3 tick marks ────────── */
@@ -613,6 +613,8 @@ export default function WorkPlan() {
   const [chartGoal,     setChartGoal]     = useState(null); // { goal, goalActions }
   const [refreshKey,    setRefreshKey]    = useState(0);
   const [hideComplete,  setHideComplete]  = useState(false);
+  const [sortBy,        setSortBy]        = useState(''); // '' | 'Goal' | 'DueDate' | 'Status'
+  const [filterOpen,    setFilterOpen]    = useState(false);
 
   /* ── queries ── */
   const plansQuery = useQuery({
@@ -650,6 +652,34 @@ export default function WorkPlan() {
     setRefreshKey(k => k + 1);
     queryClient.invalidateQueries(['planDetail', planId]);
   };
+
+  /* ── Mark Complete / Restore mutation ── */
+  const markCompleteMutation = useMutation({
+    mutationFn: (newStatusId) => api.updateGrowthPlan({
+      action: 'UpdateGrowthPlan',
+      entityId,
+      companyId,
+      growthPlanId: Number(planId),
+      statusId: newStatusId,
+    }),
+    onSuccess: () => {
+      toast.success('Plan updated');
+      queryClient.invalidateQueries(['planDetail', planId]);
+    },
+    onError: () => toast.error('Failed to update plan'),
+  });
+
+  /* ── Create Template mutation ── */
+  const createTemplateMutation = useMutation({
+    mutationFn: () => api.moveTemplates({
+      action: 'FROMGROWTHPLAN',
+      growthPlanId: Number(planId),
+      entityId,
+      companyId,
+    }),
+    onSuccess: () => toast.success('Template created'),
+    onError:   () => toast.error('Failed to create template'),
+  });
 
   /* ── No planId: plan selector ── */
   if (!planId) {
@@ -690,8 +720,16 @@ export default function WorkPlan() {
   /* ── Parse plan data ── */
   const rawData    = planQuery.data || {};
   const plan       = Array.isArray(rawData.growthPlan) ? (rawData.growthPlan[0] || {}) : (rawData.growthPlan || {});
-  const goals      = rawData.goals   || [];
+  const rawGoals   = rawData.goals   || [];
   const actions    = rawData.actions || [];
+  // Apply sort based on filter selection
+  const goals = sortBy === 'Goal'
+    ? [...rawGoals].sort((a, b) => (a.goalName || '').localeCompare(b.goalName || ''))
+    : sortBy === 'DueDate'
+    ? [...rawGoals].sort((a, b) => new Date(a.milestoneDate||0) - new Date(b.milestoneDate||0))
+    : sortBy === 'Status'
+    ? [...rawGoals].sort((a, b) => (a.goalStatus||'').localeCompare(b.goalStatus||''))
+    : rawGoals;
   const percent    = Number(plan.growthPlanPercentAchieved || 0);
   const themeColor = plan.colorCodeHex
     ? (plan.colorCodeHex.startsWith('#') ? plan.colorCodeHex : `#${plan.colorCodeHex}`)
@@ -709,7 +747,7 @@ export default function WorkPlan() {
     <div style={{ background: C.bg, minHeight: '100vh', position: 'relative' }}>
 
       {/* ── Left edge vertical tabs (Invite + Rate Meeting) — vembu style ── */}
-      <div style={{ position: 'fixed', left: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 50, display: 'flex', flexDirection: 'column', gap: 0, pointerEvents: 'none' }}>
+      <div style={{ position: 'fixed', left: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 10, display: 'flex', flexDirection: 'column', gap: 0, pointerEvents: 'none' }}>
         <div style={{
           writingMode: 'vertical-rl', textOrientation: 'mixed', transform: 'rotate(180deg)',
           background: C.teal, color: '#fff', fontSize: 12, fontWeight: 600,
@@ -778,6 +816,31 @@ export default function WorkPlan() {
             </div>
             {/* Gauge + progress bar — fills remaining space */}
             <Speedometer percent={percent} />
+
+            {/* Right action buttons — matches vembu (Mark Complete, Create Template, View Activity Log) */}
+            <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+              {plan.statusId === 2
+                ? <button
+                    onClick={() => markCompleteMutation.mutate(1)}
+                    disabled={markCompleteMutation.isPending}
+                    style={{ padding: '7px 14px', background: C.teal, color: '#fff', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
+                  >Restore Goal Plan</button>
+                : <button
+                    onClick={() => markCompleteMutation.mutate(2)}
+                    disabled={markCompleteMutation.isPending}
+                    style={{ padding: '7px 14px', background: C.teal, color: '#fff', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
+                  >Mark Growth Plan Complete</button>
+              }
+              <button
+                onClick={() => createTemplateMutation.mutate()}
+                disabled={createTemplateMutation.isPending}
+                style={{ padding: '7px 14px', background: '#888', color: '#fff', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
+              >Create Template</button>
+              <button
+                onClick={() => navigate('/reporting')}
+                style={{ padding: '7px 14px', background: C.teal, color: '#fff', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
+              >View Activity Log</button>
+            </div>
           </div>
         </div>
 
@@ -822,10 +885,29 @@ export default function WorkPlan() {
 
           <div style={{ flex: 1 }} />
 
-          {/* Filter + column headers */}
-          <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke={C.text2} strokeWidth={2} style={{ cursor: 'pointer' }}>
-            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-          </svg>
+          {/* Filter + column headers — sort popover matching vembu */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setFilterOpen(v => !v)}
+              title="Sort / Filter"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', color: filterOpen ? C.teal : C.text2, display: 'flex', alignItems: 'center' }}
+            >
+              <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}>
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+              </svg>
+            </button>
+            {filterOpen && (
+              <div style={{ position: 'absolute', right: 0, top: '100%', background: '#fff', border: `1px solid ${C.border}`, borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,.15)', zIndex: 200, minWidth: 150 }}>
+                {[{ key: 'Goal', label: 'Goal' }, { key: 'DueDate', label: 'Goal Due Date' }, { key: 'Status', label: 'Goal Status' }].map(({ key, label }) => (
+                  <button key={key} onClick={() => { setSortBy(sortBy === key ? '' : key); setFilterOpen(false); }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px', background: sortBy === key ? C.primaryLight || '#e6f7fd' : 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: sortBy === key ? C.teal : C.text, fontWeight: sortBy === key ? 600 : 400 }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f0f4f8'}
+                    onMouseLeave={e => e.currentTarget.style.background = sortBy === key ? '#e6f7fd' : 'none'}
+                  >{label}</button>
+                ))}
+              </div>
+            )}
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', fontSize: 12, color: C.text2, fontWeight: 600, gap: 8, marginLeft: 8 }}>
             <span style={{ minWidth: 80, textAlign: 'center' }}>Progress</span>
             <span style={{ minWidth: 100, textAlign: 'right' }}>Due Date</span>

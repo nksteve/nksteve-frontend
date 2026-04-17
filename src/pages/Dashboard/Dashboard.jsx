@@ -378,6 +378,7 @@ export default function Dashboard() {
                 background: C.purple, color: '#fff', border: 'none', borderRadius: 4,
                 padding: '8px 20px', cursor: 'pointer', fontSize: 14, fontWeight: 600,
               }}
+              onClick={() => navigate('/training/user')}
             >
               + Wealth
             </button>

@@ -138,7 +138,7 @@ function UserDropdown({ user, setupData, onLogout, isAdmin }) {
 // ── Company/User name center element — matches vembu header center ─────────────
 // In vembu this is an admin user-switcher dropdown (react-select)
 // We render it as a styled select input that looks like the vembu placeholder
-function CompanyUserSelect({ userList, onSwitch }) {
+function CompanyUserSelect({ userList, onSwitch, companyName, userName }) {
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -164,7 +164,9 @@ function CompanyUserSelect({ userList, onSwitch }) {
           minWidth: 220,
         }}
       >
-        <span style={{ color: C.grey }}>Company and User name</span>
+        <span style={{ color: C.grey }}>
+          {companyName && userName ? `${companyName} / ${userName}` : companyName || userName || 'Company and User name'}
+        </span>
       </div>
       {open && (
         <div style={{
@@ -328,6 +330,8 @@ export default function Layout({ children }) {
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: '0 24px' }}>
           <CompanyUserSelect
             userList={userListData}
+            companyName={setupData?.companyName || ''}
+            userName={setupData ? [setupData.firstName, setupData.lastName].filter(Boolean).join(' ') : ''}
             onSwitch={(u) => {
               // Admin user-switching functionality would go here
               console.log('Switch to user:', u);

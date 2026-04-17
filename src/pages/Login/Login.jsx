@@ -9,11 +9,11 @@ import useAuthStore from '../../store/authStore';
 export default function Login() {
   const navigate = useNavigate();
   const { setAuth } = useAuthStore();
-  const [form, setForm] = useState({ email: '', password: '', companyId: '' });
+  const [form, setForm] = useState({ email: '', password: '' });
   const [showPw, setShowPw] = useState(false);
 
   const { mutate, isPending, error } = useMutation({
-    mutationFn: () => api.login({ email: form.email, password: form.password, companyId: Number(form.companyId) }),
+    mutationFn: () => api.login({ email: form.email, password: form.password }),
     onSuccess: (res) => {
       const { token, user } = res.data;
       setAuth(user, token);
@@ -26,7 +26,7 @@ export default function Login() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.email || !form.password || !form.companyId) {
+    if (!form.email || !form.password) {
       toast.error('Please fill in all fields');
       return;
     }
@@ -98,24 +98,6 @@ export default function Login() {
             >
               {showPw ? '🙈' : '👁️'}
             </button>
-          </div>
-
-          {/* Company ID */}
-          <div style={{ marginBottom: 16 }}>
-            <input
-              type="number"
-              value={form.companyId}
-              onChange={e => setForm(f => ({ ...f, companyId: e.target.value }))}
-              placeholder="Company ID"
-              style={{
-                width: '100%', padding: '10px 14px', borderRadius: 6,
-                border: '1px solid transparent',
-                background: '#6E7F8D', color: '#fff', fontSize: 16,
-                outline: 'none', boxSizing: 'border-box',
-              }}
-              onFocus={e => e.target.style.background = '#80929E'}
-              onBlur={e => e.target.style.background = '#6E7F8D'}
-            />
           </div>
 
           {error && (

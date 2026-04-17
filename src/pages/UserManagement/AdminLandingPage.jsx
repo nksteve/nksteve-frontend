@@ -52,6 +52,7 @@ export default function AdminLandingPage() {
           <Link to="/companymanagement" style={btnStyle}>Company Management</Link>
           <Link to="/templatemanagement" style={btnStyle}>Template Management</Link>
           <Link to="/cronmanagement" style={btnStyle}>Cron Management</Link>
+          <Link to="/meetings" style={btnStyle}>Meeting Management</Link>
         </div>
       )}
 
