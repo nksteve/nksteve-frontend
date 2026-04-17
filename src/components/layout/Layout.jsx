@@ -177,7 +177,7 @@ export default function Layout({ children }) {
   const currentPath = location.pathname;
 
   return (
-    <div style={{ minHeight: '100vh', background: C.bg }}>
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: "'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
 
       {/* ── Top Header — matches vembu: logo | company+user center | name+avatar right ── */}
       <header style={{
