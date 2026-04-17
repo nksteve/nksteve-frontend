@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
-import { User, Bookmark, Briefcase, TrendingUp, Lock, Plus, X, Save, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Plus, Save, Loader2, Eye, EyeOff } from 'lucide-react';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import * as api from '../../api/client';
@@ -28,12 +28,12 @@ function Spinner() {
   );
 }
 
+// Tabs match vembu: {firstName}'s Bio & Interest | Experience | Expertise | Goal Plan
 const TABS = [
-  { id: 'bio', label: 'Bio', icon: User },
-  { id: 'interests', label: 'Interests', icon: Bookmark },
-  { id: 'experience', label: 'Experience', icon: Briefcase },
-  { id: 'plans', label: 'Growth Plans', icon: TrendingUp },
-  { id: 'password', label: 'Password', icon: Lock },
+  { id: 'bio', label: 'bio_interest' },      // dynamic label
+  { id: 'experience', label: 'Experience' },
+  { id: 'expertise', label: 'Expertise' },
+  { id: 'plans', label: 'Goal Plan' },
 ];
 
 export default function UserProfile() {
@@ -52,69 +52,124 @@ export default function UserProfile() {
     retry: false,
   });
 
+  const firstName = setupData?.firstName || '';
+  const lastName  = setupData?.lastName  || '';
+  const fullName  = [firstName, lastName].filter(Boolean).join(' ') || (user?.email ? user.email.split('@')[0] : 'User');
+  const profileImg = setupData?.imageUri || setupData?.profileImage || null;
+  const role     = setupData?.jobTitle || setupData?.title || '';
+  const dept     = setupData?.businessUnit || setupData?.department || setupData?.dept || '';
+  const location = setupData?.city || setupData?.location || '';
+  const initials = firstName && lastName
+    ? (firstName[0] + lastName[0]).toUpperCase()
+    : fullName.slice(0, 2).toUpperCase();
+
+  // Dynamic first tab label matches vembu: "David's Bio & Interest"
+  const bioTabLabel = firstName ? `${firstName}'s Bio & Interest` : 'Bio & Interest';
+
+  const tabs = [
+    { id: 'bio',        label: bioTabLabel },
+    { id: 'experience', label: 'Experience' },
+    { id: 'expertise',  label: 'Expertise' },
+    { id: 'plans',      label: 'Goal Plan' },
+  ];
+
   return (
-    <div style={{ padding: 32, maxWidth: 900, margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', gap: 20, alignItems: 'center', marginBottom: 28 }}>
-        <div style={{
-          width: 72,
-          height: 72,
-          borderRadius: '50%',
-          background: C.primary,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-        }}>
-          <User size={32} color="#fff" />
+    <div style={{ padding: '24px 32px', maxWidth: 1100, margin: '0 auto' }}>
+      {/* Header — matches vembu: name left + avatar right, role/dept/location below name */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 32, marginBottom: 28, justifyContent: 'center' }}>
+        <div style={{ textAlign: 'right' }}>
+          {/* First name as teal link — matches vembu */}
+          <a href="#" style={{ fontSize: 20, fontWeight: 600, color: C.primary, textDecoration: 'none' }}>{firstName || fullName}</a>
+          {role && <div><a href="#" style={{ fontSize: 14, color: C.primary, textDecoration: 'none' }}>{role}</a></div>}
+          {dept && <div><a href="#" style={{ fontSize: 14, color: C.primary, textDecoration: 'none' }}>{dept}</a></div>}
+          {location && <div><a href="#" style={{ fontSize: 14, color: C.primary, textDecoration: 'none' }}>{location}</a></div>}
         </div>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: C.text }}>
-            {setupData?.firstName && setupData?.lastName
-              ? `${setupData.firstName} ${setupData.lastName}`
-              : (user?.email ? user.email.split('@')[0] : 'User Profile')}
-          </h1>
-          <p style={{ margin: '4px 0 0', color: C.text2, fontSize: 14 }}>{user?.email || ''}</p>
+        {/* Avatar — matches vembu's robot avatar style */}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          {profileImg ? (
+            <img
+              src={profileImg}
+              alt={fullName}
+              style={{ width: 100, height: 100, borderRadius: '50%', objectFit: 'cover', border: `2px solid ${C.border}` }}
+            />
+          ) : (
+            <div style={{
+              width: 100, height: 100, borderRadius: '50%',
+              background: '#e8f4fa', border: `2px solid ${C.border}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              overflow: 'hidden',
+            }}>
+              {/* Vembu-style user icon (robot avatar) */}
+              <svg width="70" height="70" viewBox="0 0 70 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="35" cy="25" r="14" fill="#0197cc" opacity="0.8"/>
+                <circle cx="35" cy="25" r="10" fill="#0197cc"/>
+                <circle cx="29" cy="23" r="3" fill="white"/>
+                <circle cx="41" cy="23" r="3" fill="white"/>
+                <circle cx="29" cy="23" r="1.5" fill="#0197cc"/>
+                <circle cx="41" cy="23" r="1.5" fill="#0197cc"/>
+                <path d="M28 30 Q35 35 42 30" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+                <rect x="32" y="12" width="6" height="4" rx="2" fill="#0197cc" opacity="0.6"/>
+                <rect x="34" y="8" width="2" height="6" rx="1" fill="#0197cc" opacity="0.5"/>
+                <path d="M10 60 Q35 42 60 60" fill="#0197cc" opacity="0.6"/>
+              </svg>
+            </div>
+          )}
+          {/* Edit avatar icon — matches vembu */}
+          <button style={{
+            position: 'absolute', bottom: 4, right: 4,
+            width: 22, height: 22, borderRadius: '50%',
+            background: C.primary, border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 2, borderBottom: `1px solid ${C.border}`, marginBottom: 28, overflowX: 'auto' }}>
-        {TABS.map(({ id, label, icon: Icon }) => (
+      {/* Tabs — match vembu: underlined active tab */}
+      <div style={{
+        display: 'flex', gap: 0,
+        borderBottom: `1px solid ${C.border}`,
+        marginBottom: 24,
+        background: '#f8f9fa',
+        borderRadius: '4px 4px 0 0',
+      }}>
+        {tabs.map(({ id, label }) => (
           <button
             key={id}
             onClick={() => setActiveTab(id)}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '10px 18px',
+              padding: '12px 20px',
               border: 'none',
               background: 'transparent',
               cursor: 'pointer',
               fontSize: 14,
               fontWeight: activeTab === id ? 600 : 400,
-              color: activeTab === id ? C.primary : C.text2,
-              borderBottom: activeTab === id ? `2px solid ${C.primary}` : '2px solid transparent',
+              color: activeTab === id ? C.primary : '#555',
+              borderBottom: activeTab === id ? `3px solid ${C.primary}` : '3px solid transparent',
               marginBottom: -1,
               whiteSpace: 'nowrap',
+              letterSpacing: 0,
             }}
           >
-            <Icon size={14} /> {label}
+            {label}
           </button>
         ))}
       </div>
 
-      {activeTab === 'bio' && <BioTab entityId={entityId} queryClient={queryClient} />}
-      {activeTab === 'interests' && <InterestsTab entityId={entityId} queryClient={queryClient} />}
+      {activeTab === 'bio'        && <BioInterestTab entityId={entityId} queryClient={queryClient} />}
       {activeTab === 'experience' && <ExperienceTab entityId={entityId} queryClient={queryClient} />}
-      {activeTab === 'plans' && <PlansTab entityId={entityId} />}
-      {activeTab === 'password' && <PasswordTab entityId={entityId} />}
+      {activeTab === 'expertise'  && <ExpertiseTab entityId={entityId} />}
+      {activeTab === 'plans'      && <PlansTab entityId={entityId} />}
     </div>
   );
 }
 
-function BioTab({ entityId, queryClient }) {
+// Bio & Interest Tab — matches vembu's combined "Bio & Interest" tab
+function BioInterestTab({ entityId, queryClient }) {
   const [editing, setEditing] = useState(false);
   const [bioContent, setBioContent] = useState('');
 
@@ -136,36 +191,103 @@ function BioTab({ entityId, queryClient }) {
     onError: () => toast.error('Failed to save bio'),
   });
 
+  const { data: interests = [], isLoadingInterests } = useQuery({
+    queryKey: ['interests', entityId],
+    queryFn: () => api.getEntityInterests(entityId),
+    select: (res) => res.data?.interests || res.data?.result || [],
+    enabled: !!entityId,
+  });
+
+  const [newInterest, setNewInterest] = useState('');
+  const addInterestMutation = useMutation({
+    mutationFn: () => api.updateEntityInterests({ entityId, action: 'ADD', tag: newInterest }),
+    onSuccess: () => {
+      toast.success('Interest added!');
+      queryClient.invalidateQueries(['interests', entityId]);
+      setNewInterest('');
+    },
+    onError: () => toast.error('Failed to add interest'),
+  });
+
   if (isLoading) return <Spinner />;
 
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: C.text }}>About Me</h2>
-        <button
-          onClick={() => {
-            if (!editing) setBioContent(bio || '');
-            setEditing(!editing);
-          }}
-          style={{ padding: '7px 16px', background: editing ? C.bg : C.primaryLight, color: editing ? C.text2 : C.primary, border: `1px solid ${editing ? C.border : C.primary}`, borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
-        >
-          {editing ? 'Cancel' : 'Edit'}
-        </button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* My Bio card — matches vembu */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: C.text }}>
+            My Bio
+            {/* Edit pencil icon — matches vembu */}
+            <button
+              onClick={() => { if (!editing) setBioContent(bio || ''); setEditing(!editing); }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', marginLeft: 8, padding: 0, verticalAlign: 'middle' }}
+              title="Edit bio"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.primary} strokeWidth="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
+          </h2>
+        </div>
+        {editing ? (
+          <>
+            <ReactQuill value={bioContent} onChange={setBioContent} style={{ marginBottom: 16 }} />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setEditing(false)} style={{ padding: '8px 16px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer', fontSize: 14 }}>Cancel</button>
+              <button
+                onClick={() => updateMutation.mutate()}
+                disabled={updateMutation.isPending}
+                style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '8px 20px', background: C.primary, color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 600, fontSize: 14 }}
+              >
+                <Save size={14} /> {updateMutation.isPending ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <div style={{ fontSize: 14, color: C.text, lineHeight: 1.7 }} dangerouslySetInnerHTML={{ __html: bio || '<em style="color:#aaa">No bio yet. Click the pencil to add one.</em>' }} />
+        )}
       </div>
-      {editing ? (
-        <>
-          <ReactQuill value={bioContent} onChange={setBioContent} style={{ marginBottom: 16 }} />
+
+      {/* My Interests card — matches vembu */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 24 }}>
+        <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: C.text }}>
+          My Interests
+          <span style={{ marginLeft: 8, verticalAlign: 'middle', cursor: 'pointer' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.primary} strokeWidth="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </span>
+        </h2>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+          {interests.length === 0 && <span style={{ color: C.text2, fontSize: 14 }}>No interests yet.</span>}
+          {interests.map((interest, i) => {
+            const label = interest.category || interest.tag || interest.name || `Interest ${i + 1}`;
+            return (
+              <span key={i} style={{ padding: '5px 14px', background: '#e6f7fd', color: C.primary, borderRadius: 20, fontSize: 13 }}>{label}</span>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <input
+            type="text"
+            value={newInterest}
+            onChange={e => setNewInterest(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && newInterest.trim() && addInterestMutation.mutate()}
+            placeholder="Add an interest…"
+            style={{ flex: 1, padding: '8px 12px', border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 14, outline: 'none' }}
+          />
           <button
-            onClick={() => updateMutation.mutate()}
-            disabled={updateMutation.isPending}
-            style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '9px 20px', background: C.primary, color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 14 }}
+            onClick={() => newInterest.trim() && addInterestMutation.mutate()}
+            disabled={addInterestMutation.isPending || !newInterest.trim()}
+            style={{ padding: '8px 16px', background: C.primary, color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
           >
-            <Save size={14} /> {updateMutation.isPending ? 'Saving…' : 'Save Bio'}
+            Add
           </button>
-        </>
-      ) : (
-        <div style={{ fontSize: 14, color: C.text, lineHeight: 1.7 }} dangerouslySetInnerHTML={{ __html: bio || '<em style="color:#94a3b8">No bio yet. Click Edit to add one.</em>' }} />
-      )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -321,6 +443,49 @@ function ExperienceTab({ entityId, queryClient }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// Expertise Tab — matches vembu's Expertise tab (tags/skills)
+function ExpertiseTab({ entityId }) {
+  const { data: expertiseTags = [], isLoading } = useQuery({
+    queryKey: ['mmGoals', entityId],
+    queryFn: async () => {
+      const res = await fetch('/api/getMMGoal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('onup_token')}` },
+        body: JSON.stringify({ mmEntityId: entityId }),
+      });
+      return res.json();
+    },
+    select: (data) => data?.goalList || [],
+    enabled: !!entityId,
+    retry: false,
+  });
+
+  if (isLoading) return <Spinner />;
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e4e7ea', borderRadius: 8, padding: 24 }}>
+      <h2 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 600, color: '#23282c' }}>Personal Expertise</h2>
+      {expertiseTags.length === 0 ? (
+        <div style={{ color: '#989898', fontSize: 14 }}>No expertise tags yet.</div>
+      ) : (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {expertiseTags.map((tag, i) => (
+            <span key={i} style={{
+              padding: '5px 14px',
+              background: '#e6f7fd',
+              color: '#0197cc',
+              borderRadius: 20,
+              fontSize: 13,
+            }}>
+              {tag.tagName || tag.name || tag.tag}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

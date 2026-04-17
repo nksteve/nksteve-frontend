@@ -143,14 +143,14 @@ function CompanyUserSelect({ userList, onSwitch }) {
       <div
         onClick={() => setOpen(o => !o)}
         style={{
-          border: `1px solid ${C.border}`, borderRadius: 4,
-          padding: '7px 12px', background: C.white,
+          border: 'none', borderRadius: 4,
+          padding: '7px 12px', background: 'transparent',
           fontSize: 14, color: C.grey, cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          minWidth: 220,
         }}
       >
         <span>Company and User name</span>
-        <span style={{ fontSize: 10, color: C.grey }}>▼</span>
       </div>
       {open && (
         <div style={{
@@ -294,7 +294,7 @@ export default function Layout({ children }) {
       <header style={{
         position: 'sticky', top: 0, zIndex: 1000,
         background: C.headerBg, borderBottom: `1px solid ${C.border}`,
-        height: 85, display: 'flex', alignItems: 'center',
+        height: 70, display: 'flex', alignItems: 'center',
         padding: '0 24px',
         justifyContent: 'space-between',
         boxShadow: '0 1px 4px rgba(0,0,0,.08)',
@@ -306,7 +306,7 @@ export default function Layout({ children }) {
           <img
             src="/logo.png"
             alt="TeamOnUP"
-            style={{ width: 220, height: 'auto', objectFit: 'contain', maxHeight: 70 }}
+            style={{ width: 300, height: 'auto', objectFit: 'contain', maxHeight: 70 }}
           />
         </Link>
 

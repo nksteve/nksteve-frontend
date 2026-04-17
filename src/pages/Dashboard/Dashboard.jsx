@@ -445,7 +445,7 @@ export default function Dashboard() {
             <PlanCard
               key={plan.growthPlanId || plan.planId || i}
               plan={plan}
-              onClick={() => navigate(`/plan/${plan.growthPlanId || plan.planId}`)}
+              onClick={() => navigate(`/work-plan?planId=${plan.growthPlanId || plan.planId}`)}
             />
           ))
         )}
