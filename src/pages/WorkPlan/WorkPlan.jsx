@@ -533,14 +533,18 @@ function NotesModal({ onClose, growthPlanId, goalTagId, actionTagId, planColor }
 }
 
 /* ─── Files Modal ───────────────────────────────────────────────────────────────────── */
+/* ─── FilesModal ─ two tabs: Upload + Attachment (matches vembu GoalFiles) ─── */
 function FilesModal({ onClose, growthPlanId, goalTagId, actionTagId, planColor }) {
-  const [docs, setDocs]         = useState([]);
-  const [loading, setLoading]   = useState(true);
+  const [docs, setDocs]           = useState([]);
+  const [loading, setLoading]     = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [linkMode, setLinkMode] = useState(false);
-  const [linkUrl, setLinkUrl]   = useState('');
-  const [linkName, setLinkName] = useState('');
+  const [activeTab, setActiveTab] = useState('upload');  // 'upload' | 'attachment'
+  const [linkMode, setLinkMode]   = useState(false);     // show link form inside Upload tab
+  const [linkUrl, setLinkUrl]     = useState('');
+  const [linkName, setLinkName]   = useState('');
   const title = actionTagId ? 'Action Files' : 'Goal Files';
+  const accent = planColor || C.teal;
+  const user   = useAuthStore(s => s.user);
 
   useEffect(() => { fetchDocs(); }, []);
 
@@ -553,17 +557,57 @@ function FilesModal({ onClose, growthPlanId, goalTagId, actionTagId, planColor }
     setLoading(false);
   }
 
-  async function addLink() {
-    if (!linkUrl.trim()) return;
+  /* ── File upload via <input type=file> → /api/fileUpload → /api/updateGoalfile ── */
+  async function handleFileChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowed = ['jpeg','jpg','gif','png','pdf','mp4','mkv','3gp','doc','docx','docm','pptx','xls','xlsx','xlsm'];
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!allowed.includes(ext)) { toast.error('File format not supported'); return; }
+    setUploading(true);
+    try {
+      // 1. Upload to S3 via backend
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('entityId', String(user?.entityId || ''));
+      formData.append('type', 'Goal');
+      const token = localStorage.getItem('onup_token');
+      const uploadRes = await fetch('/api/fileUpload', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      if (!uploadRes.ok) throw new Error(await uploadRes.text());
+      const { Location } = await uploadRes.json();
+      // 2. Save metadata to documents table
+      const saveRes = await api.updateGoalfile({
+        action: 'ADD', growthPlanId, goalTagId, actionTagId,
+        fileName: file.name, fileUrl: Location,
+      });
+      setDocs(saveRes.data.result || []);
+      setActiveTab('attachment');
+      toast.success('File uploaded');
+    } catch(err) {
+      console.error(err);
+      toast.error('Upload failed: ' + (err.message || 'unknown error'));
+    }
+    setUploading(false);
+    e.target.value = '';
+  }
+
+  /* ── Share a link ── */
+  async function saveLink() {
+    if (!linkUrl.trim() || !linkName.trim()) { toast.error('Please enter both URL and description'); return; }
     setUploading(true);
     try {
       const res = await api.updateGoalfile({
         action: 'ADD', growthPlanId, goalTagId, actionTagId,
-        fileName: linkName.trim() || linkUrl, fileUrl: linkUrl.trim(),
+        fileName: linkName.trim(), fileUrl: linkUrl.trim(),
       });
       setDocs(res.data.result || []);
       setLinkUrl(''); setLinkName(''); setLinkMode(false);
-    } catch(e) { toast.error('Failed to add link'); }
+      setActiveTab('attachment');
+    } catch(e) { toast.error('Failed to save link'); }
     setUploading(false);
   }
 
@@ -571,64 +615,129 @@ function FilesModal({ onClose, growthPlanId, goalTagId, actionTagId, planColor }
     try {
       await api.updateGoalfile({ action: 'DELETE', growthPlanId, documentId });
       setDocs(prev => prev.filter(d => d.documentId !== documentId));
-    } catch(e) { toast.error('Failed to delete file'); }
+    } catch(e) { toast.error('Failed to delete'); }
   }
 
-  function getFileIcon(url) {
-    if (!url) return '📎';
-    const ext = url.split('.').pop().toLowerCase();
-    if (['jpg','jpeg','png','gif','webp'].includes(ext)) return '🖼️';
+  function fileThumb(url, name) {
+    if (!url || !name) return null;
+    const ext = name.split('.').pop().toLowerCase();
+    if (['jpg','jpeg','png','gif'].includes(ext)) return url;
+    return null;
+  }
+
+  function fileTypeIcon(name) {
+    if (!name) return '📎';
+    const ext = name.split('.').pop().toLowerCase();
+    if (['jpg','jpeg','png','gif'].includes(ext)) return '🖼';
     if (ext === 'pdf') return '📄';
-    if (['doc','docx'].includes(ext)) return '📃';
-    if (['xls','xlsx'].includes(ext)) return '📊';
+    if (['doc','docx','docm'].includes(ext)) return '📝';
+    if (['xls','xlsx','xlsm'].includes(ext)) return '📊';
     if (['ppt','pptx'].includes(ext)) return '📋';
-    if (['mp4','mov','avi'].includes(ext)) return '🎥';
-    return '📎';
+    if (['mp4','mkv','3gp'].includes(ext)) return '▶';
+    return '🔗';
   }
 
-  const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' };
-  const modal   = { background: '#fff', borderRadius: 8, width: 580, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' };
-  const header  = { background: planColor || C.teal, color: '#fff', padding: '14px 20px', borderRadius: '8px 8px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' };
+  const overlay = { position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center' };
+  const modal   = { background:'#fff', borderRadius:8, width:520, maxHeight:'82vh', display:'flex', flexDirection:'column', boxShadow:'0 8px 32px rgba(0,0,0,0.22)' };
+  const tabStyle = (active) => ({
+    padding:'8px 18px', cursor:'pointer', fontSize:13, fontWeight:600,
+    borderBottom: active ? `2px solid ${accent}` : '2px solid transparent',
+    color: active ? accent : '#555', background:'none', border:'none',
+    borderBottom: active ? `2px solid ${accent}` : '2px solid transparent',
+  });
 
   return (
     <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={modal}>
-        <div style={header}>
-          <span style={{ fontWeight: 700, fontSize: 16 }}>{title}</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>×</button>
+        {/* Header */}
+        <div style={{ background: accent, color:'#fff', padding:'13px 18px', borderRadius:'8px 8px 0 0', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <span style={{ fontWeight:700, fontSize:15 }}>{title}</span>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'#fff', cursor:'pointer', fontSize:20, lineHeight:1 }}>×</button>
         </div>
-        {/* Add link */}
-        <div style={{ padding: 16, borderBottom: '1px solid #e8e8e8' }}>
-          {!linkMode ? (
-            <button
-              onClick={() => setLinkMode(true)}
-              style={{ background: planColor || C.teal, color: '#fff', border: 'none', borderRadius: 4, padding: '7px 16px', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}
-            >+ Add Link</button>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <input value={linkUrl} onChange={e => setLinkUrl(e.target.value)} placeholder="URL (https://...)" style={{ border: '1px solid #c8ced3', borderRadius: 4, padding: '6px 10px', fontSize: 13 }} />
-              <input value={linkName} onChange={e => setLinkName(e.target.value)} placeholder="Display name (optional)" style={{ border: '1px solid #c8ced3', borderRadius: 4, padding: '6px 10px', fontSize: 13 }} />
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={addLink} disabled={uploading || !linkUrl.trim()} style={{ background: planColor || C.teal, color: '#fff', border: 'none', borderRadius: 4, padding: '6px 16px', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>{uploading ? 'Adding...' : 'Add'}</button>
-                <button onClick={() => { setLinkMode(false); setLinkUrl(''); setLinkName(''); }} style={{ background: '#6c757d', color: '#fff', border: 'none', borderRadius: 4, padding: '6px 16px', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
-              </div>
+
+        {/* Tabs */}
+        <div style={{ display:'flex', borderBottom:'1px solid #e0e0e0', padding:'0 16px' }}>
+          <button style={tabStyle(activeTab==='upload')}    onClick={() => { setActiveTab('upload');    setLinkMode(false); }}>Upload</button>
+          <button style={tabStyle(activeTab==='attachment')} onClick={() => setActiveTab('attachment')}>Attachment</button>
+        </div>
+
+        {/* Tab content */}
+        <div style={{ flex:1, overflowY:'auto' }}>
+
+          {/* ── UPLOAD TAB ── */}
+          {activeTab === 'upload' && (
+            <div style={{ padding:24 }}>
+              {!linkMode ? (
+                <div style={{ display:'flex', gap:24, justifyContent:'center', alignItems:'flex-start' }}>
+                  {/* Upload from computer */}
+                  <label style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:10, width:200, cursor:'pointer' }}>
+                    <div style={{ width:80, height:80, background:'#e8f4fb', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:36 }}>
+                      {uploading ? '⏳' : '⬆'}
+                    </div>
+                    <span style={{ fontSize:13, fontWeight:600, color:C.text, textAlign:'center' }}>Upload files from your computer</span>
+                    <span style={{ fontSize:11, color:C.text2, textAlign:'center' }}>(Supports images, pdf, docx, pptx, xlsx)</span>
+                    <input type="file" style={{ display:'none' }} onChange={handleFileChange} disabled={uploading}
+                      accept=".jpeg,.jpg,.gif,.png,.pdf,.mp4,.mkv,.3gp,.doc,.docx,.docm,.pptx,.xls,.xlsx,.xlsm" />
+                  </label>
+                  {/* Share a link */}
+                  <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:10, width:180, cursor:'pointer' }}
+                    onClick={() => setLinkMode(true)}>
+                    <div style={{ width:80, height:80, background:'#f0faf0', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:36 }}>🔗</div>
+                    <span style={{ fontSize:13, fontWeight:600, color:C.text, textAlign:'center' }}>For large files share a link here</span>
+                  </div>
+                </div>
+              ) : (
+                /* Link form */
+                <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                  <div>
+                    <label style={{ fontSize:13, fontWeight:600, color:C.text, display:'block', marginBottom:4 }}>URL:</label>
+                    <input value={linkUrl} onChange={e => setLinkUrl(e.target.value)}
+                      placeholder="https://..." style={{ width:'100%', boxSizing:'border-box', border:'1px solid #c8ced3', borderRadius:4, padding:'7px 10px', fontSize:13 }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize:13, fontWeight:600, color:C.text, display:'block', marginBottom:4 }}>Description:</label>
+                    <textarea value={linkName} onChange={e => setLinkName(e.target.value)}
+                      rows={3} placeholder="Describe the link..."
+                      style={{ width:'100%', boxSizing:'border-box', border:'1px solid #c8ced3', borderRadius:4, padding:'7px 10px', fontSize:13, resize:'vertical' }} />
+                  </div>
+                  <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+                    <button onClick={() => setLinkMode(false)}
+                      style={{ background:'none', border:'none', color:accent, cursor:'pointer', fontSize:13, fontWeight:600 }}>Back</button>
+                    <button onClick={saveLink} disabled={uploading}
+                      style={{ background:accent, color:'#fff', border:'none', borderRadius:4, padding:'7px 20px', cursor:'pointer', fontWeight:600, fontSize:13 }}>
+                      {uploading ? 'Saving...' : 'Share Link'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
-        </div>
-        {/* File list */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
-          {loading ? <div style={{ textAlign: 'center', color: C.text2, padding: 24 }}>Loading...</div>
-          : docs.length === 0 ? <div style={{ textAlign: 'center', color: C.text2, padding: 24, fontSize: 13 }}>No files yet.</div>
-          : docs.map(d => (
-            <div key={d.documentId} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, padding: '8px 12px', background: '#f8f9fa', borderRadius: 6, borderLeft: `3px solid ${planColor || C.teal}` }}>
-              <span style={{ fontSize: 20 }}>{getFileIcon(d.fileUrl)}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <a href={d.fileUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: planColor || C.teal, fontWeight: 600, textDecoration: 'none', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fileName}</a>
-                <span style={{ fontSize: 11, color: C.text2 }}>{new Date(d.created).toLocaleDateString()}</span>
-              </div>
-              <button onClick={() => deleteDoc(d.documentId)} style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer', fontSize: 12, flexShrink: 0 }}>Remove</button>
+
+          {/* ── ATTACHMENT TAB ── */}
+          {activeTab === 'attachment' && (
+            <div style={{ padding:16 }}>
+              {loading ? (
+                <div style={{ textAlign:'center', color:C.text2, padding:32, fontSize:13 }}>Loading...</div>
+              ) : docs.length === 0 ? (
+                <div style={{ textAlign:'center', color:C.text2, padding:32, fontSize:13 }}>No attachments yet.</div>
+              ) : (
+                docs.map(d => (
+                  <div key={d.documentId} style={{ display:'flex', alignItems:'center', gap:12, marginBottom:10, padding:'9px 12px', background:'#f8f9fa', borderRadius:6, borderLeft:`3px solid ${accent}` }}>
+                    <span style={{ fontSize:22, flexShrink:0 }}>{fileTypeIcon(d.fileName)}</span>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <a href={d.fileUrl} target="_blank" rel="noreferrer"
+                        style={{ fontSize:13, color:accent, fontWeight:600, textDecoration:'none', display:'block', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        {d.fileName}
+                      </a>
+                      <span style={{ fontSize:11, color:C.text2 }}>{new Date(d.created).toLocaleDateString()}</span>
+                    </div>
+                    <button onClick={() => deleteDoc(d.documentId)}
+                      style={{ background:'none', border:'none', color:'#dc3545', cursor:'pointer', fontSize:12, flexShrink:0 }}>Remove</button>
+                  </div>
+                ))
+              )}
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>
