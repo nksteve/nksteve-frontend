@@ -59,13 +59,16 @@ function PlanCard({ plan, onClick }) {
       onClick={() => onClick(plan)}
       style={{
         background: C.white,
-        borderBottom: `1px solid ${C.border}`,
-        padding: '14px 16px',
+        border: `1px solid ${C.border}`,
+        borderRadius: 4,
+        boxShadow: '0 1px 3px rgba(0,0,0,.06)',
+        padding: '16px 20px',
+        marginBottom: 4,
         cursor: 'pointer',
-        transition: 'background .15s',
+        transition: 'box-shadow .15s',
       }}
-      onMouseEnter={e => e.currentTarget.style.background = '#f8f9fa'}
-      onMouseLeave={e => e.currentTarget.style.background = C.white}
+      onMouseEnter={e => e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,.12)'}
+      onMouseLeave={e => e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,.06)'}
     >
       {/* Plan name row */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
@@ -429,7 +432,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Plan list ────────────────────────────────────────────────────────── */}
-      <div style={{ padding: '0 24px 24px', background: C.white, margin: '0 0 24px' }}>
+      <div style={{ padding: '16px 24px 24px', background: C.bg, margin: '0 0 24px' }}>
         {isLoading ? (
           <div style={{ textAlign: 'center', padding: 60, color: C.grey, fontSize: 15 }}>
             Loading plans…

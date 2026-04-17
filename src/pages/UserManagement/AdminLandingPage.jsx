@@ -38,7 +38,7 @@ export default function AdminLandingPage() {
       alignItems: 'center',
       textAlign: 'center',
       minHeight: 'calc(100vh - 133px)',
-      background: C.bg,
+      background: '#ffffff',
       padding: '40px 24px',
     }}>
       {/* Title */}

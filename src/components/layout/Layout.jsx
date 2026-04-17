@@ -74,13 +74,24 @@ function UserDropdown({ user, setupData, onLogout, isAdmin }) {
             onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
           />
         ) : null}
+        {/* Vembu-style teal robot avatar (matches vembu header exactly) */}
         <div style={{
           width: 44, height: 44, borderRadius: '50%',
-          background: C.teal, display: profileImg ? 'none' : 'flex', alignItems: 'center',
-          justifyContent: 'center', color: C.white, fontWeight: 700, fontSize: 15,
-          flexShrink: 0,
+          background: '#e8f4fa', display: profileImg ? 'none' : 'flex', alignItems: 'center',
+          justifyContent: 'center', flexShrink: 0, border: '1px solid #c8e6f5', overflow: 'hidden',
         }}>
-          {initials}
+          <svg width="34" height="34" viewBox="0 0 70 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="35" cy="25" r="14" fill="#0197cc" opacity="0.8"/>
+            <circle cx="35" cy="25" r="10" fill="#0197cc"/>
+            <circle cx="29" cy="23" r="3" fill="white"/>
+            <circle cx="41" cy="23" r="3" fill="white"/>
+            <circle cx="29" cy="23" r="1.5" fill="#0197cc"/>
+            <circle cx="41" cy="23" r="1.5" fill="#0197cc"/>
+            <path d="M28 30 Q35 35 42 30" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+            <rect x="32" y="12" width="6" height="4" rx="2" fill="#0197cc" opacity="0.6"/>
+            <rect x="34" y="8" width="2" height="6" rx="1" fill="#0197cc" opacity="0.5"/>
+            <path d="M10 60 Q35 42 60 60" fill="#0197cc" opacity="0.6"/>
+          </svg>
         </div>
       </button>
 
@@ -140,23 +151,20 @@ function CompanyUserSelect({ userList, onSwitch }) {
 
   return (
     <div ref={ref} style={{ position: 'relative', width: 260 }}>
-      {/* Vembu: rounded bordered input box (react-select style), borderRadius 10px, borderColor #f0f0f0 */}
+      {/* Vembu: plain text label, no border — matches vembu header exactly */}
       <div
         onClick={() => setOpen(o => !o)}
         style={{
-          border: '1px solid #f0f0f0',
-          borderRadius: 10,
-          padding: '7px 14px',
-          background: C.white,
+          border: 'none',
+          borderRadius: 4,
+          padding: '7px 12px',
+          background: 'transparent',
           fontSize: 14, color: C.grey, cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          minWidth: 240,
-          boxShadow: open ? '0 0 0 0.2rem rgba(0,123,255,.25)' : 'none',
-          transition: 'box-shadow .15s',
+          minWidth: 220,
         }}
       >
-        <span style={{ color: '#aaa' }}>Company and User name</span>
-        <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="#ccc" strokeWidth={2}><polyline points="6 9 12 15 18 9"/></svg>
+        <span style={{ color: C.grey }}>Company and User name</span>
       </div>
       {open && (
         <div style={{

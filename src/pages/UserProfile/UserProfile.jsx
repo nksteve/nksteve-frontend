@@ -57,7 +57,8 @@ export default function UserProfile() {
   const fullName  = [firstName, lastName].filter(Boolean).join(' ') || (user?.email ? user.email.split('@')[0] : 'User');
   const profileImg = setupData?.imageUri || setupData?.profileImage || null;
   const role     = setupData?.jobTitle || setupData?.title || '';
-  const dept     = setupData?.businessUnit || setupData?.department || setupData?.dept || '';
+  const dept     = setupData?.departmentName || setupData?.businessUnit || setupData?.department || setupData?.dept || '';
+  const motivation = setupData?.myMotivation || '';
   const location = setupData?.city || setupData?.location || '';
   const initials = firstName && lastName
     ? (firstName[0] + lastName[0]).toUpperCase()
@@ -160,7 +161,7 @@ export default function UserProfile() {
         ))}
       </div>
 
-      {activeTab === 'bio'        && <BioInterestTab entityId={entityId} queryClient={queryClient} />}
+      {activeTab === 'bio'        && <BioInterestTab entityId={entityId} queryClient={queryClient} motivation={motivation} />}
       {activeTab === 'experience' && <ExperienceTab entityId={entityId} queryClient={queryClient} />}
       {activeTab === 'expertise'  && <ExpertiseTab entityId={entityId} />}
       {activeTab === 'plans'      && <PlansTab entityId={entityId} />}
@@ -169,7 +170,7 @@ export default function UserProfile() {
 }
 
 // Bio & Interest Tab — matches vembu's combined "Bio & Interest" tab
-function BioInterestTab({ entityId, queryClient }) {
+function BioInterestTab({ entityId, queryClient, motivation }) {
   const [editing, setEditing] = useState(false);
   const [bioContent, setBioContent] = useState('');
 
@@ -249,6 +250,22 @@ function BioInterestTab({ entityId, queryClient }) {
           <div style={{ fontSize: 14, color: C.text, lineHeight: 1.7 }} dangerouslySetInnerHTML={{ __html: bio || '<em style="color:#aaa">No bio yet. Click the pencil to add one.</em>' }} />
         )}
       </div>
+
+      {/* What Motivates Me card — matches vembu (shows myMotivation from entity setup) */}
+      {motivation && (
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 24 }}>
+          <h2 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 600, color: C.text }}>
+            What Motivates Me?
+            <span style={{ marginLeft: 8, verticalAlign: 'middle', cursor: 'pointer' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.primary} strokeWidth="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </span>
+          </h2>
+          <p style={{ fontSize: 14, color: C.text, lineHeight: 1.7, margin: 0 }}>{motivation}</p>
+        </div>
+      )}
 
       {/* My Interests card — matches vembu */}
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 24 }}>
