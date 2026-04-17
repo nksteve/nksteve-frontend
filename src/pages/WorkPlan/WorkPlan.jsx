@@ -4,11 +4,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import {
   RefreshCw, Plus, Loader2, AlertCircle, X,
-  BarChart2, Users, Video, FileText, Zap, Activity,
-  ArrowUp, MessageCircle,
+  BarChart2, ArrowUp, MessageCircle, Users,
 } from 'lucide-react';
-import ReactQuill from 'react-quill-new';
-import 'react-quill-new/dist/quill.snow.css';
+import { Slider } from '@mui/material';
+import { styled } from '@mui/material/styles';
 import * as api from '../../api/client';
 import useAuthStore from '../../store/authStore';
 
@@ -142,27 +141,51 @@ function GoalProgressBar({ pct, goalMin, goalStretch, themeColor }) {
   );
 }
 
-/* ─── Action progress slider — matches vembu: colored track + large circle thumb ── */
-function ActionSlider({ pct }) {
+/* ─── Action progress slider — MUI Slider, matches vembu exactly ──────────── */
+// Color logic matches vembu: orange <50, #008ECC 50-79, #0B6623 >=80
+function sliderColor(pct) {
+  if (pct >= 80) return '#0B6623';
+  if (pct >= 50) return '#008ECC';
+  return 'orange';
+}
+
+function ActionSlider({ pct, onCommit }) {
   const p = Math.min(100, Math.max(0, Number(pct) || 0));
-  const color = p >= 80 ? '#0B6623' : p >= 50 ? '#e6a817' : '#e6a817'; // green>=80, gold otherwise
-  const trackFill = p === 0 ? 'transparent' : color;
+  const [localVal, setLocalVal] = useState(p);
+  const color = sliderColor(localVal);
+
+  // Rebuild styled slider whenever color changes
+  const PrettoSlider = styled(Slider)({
+    color,
+    height: 6,
+    padding: '10px 0',
+    '& .MuiSlider-thumb': {
+      height: 20,
+      width: 20,
+      backgroundColor: '#fff',
+      border: '2px solid currentColor',
+      '&:focus,&:hover,&.Mui-active': { boxShadow: 'inherit' },
+    },
+    '& .MuiSlider-track': { height: 6, borderRadius: 3 },
+    '& .MuiSlider-rail': { height: 6, borderRadius: 3, opacity: 0.3 },
+    '& .MuiSlider-valueLabel': {
+      fontSize: 11, background: color,
+    },
+  });
 
   return (
-    <div style={{ flex: 1, position: 'relative', height: 6, background: '#e8e8e8', borderRadius: 3, margin: '0 6px' }}>
-      {p > 0 && (
-        <div style={{ width: `${p}%`, height: '100%', background: color, borderRadius: 3 }} />
-      )}
-      <div style={{
-        position: 'absolute',
-        left: `calc(${p}% - 11px)`,
-        top: '50%',
-        transform: 'translateY(-50%)',
-        width: 22, height: 22, borderRadius: '50%',
-        background: '#fff',
-        border: `2.5px solid ${p >= 80 ? '#0B6623' : '#e6a817'}`,
-        boxShadow: '0 1px 3px rgba(0,0,0,.15)',
-      }} />
+    <div style={{ flex: 1, padding: '0 8px', display: 'flex', alignItems: 'center' }}>
+      <PrettoSlider
+        value={localVal}
+        valueLabelDisplay="auto"
+        onChange={(_, val) => {
+          setLocalVal(val);
+        }}
+        onChangeCommitted={(_, val) => {
+          setLocalVal(val);
+          onCommit && onCommit(val / 100);
+        }}
+      />
     </div>
   );
 }
@@ -210,7 +233,7 @@ function GoalRow({ goal, goalActions, onChartClick }) {
   const bgcolor = C.purple; // vembu always uses purple for goal rows
 
   return (
-    <tr style={{ background: bgcolor }}>
+    <tr style={{ background: bgcolor, height: 34 }}>
       {/* Left color stripe */}
       <td style={{ width: 4, background: bgcolor, padding: 0 }} />
 
@@ -222,12 +245,17 @@ function GoalRow({ goal, goalActions, onChartClick }) {
         </div>
       </td>
 
-      {/* Goal name — vembu: plain white text in the colored band */}
+      {/* Goal name — vembu: white input-box style on the purple band */}
       <td style={{ padding: '0 6px', width: 249 }}>
         <div style={{
-          fontSize: 13, fontWeight: 600, color: '#fff',
+          fontSize: 13, fontWeight: 600, color: C.text,
+          background: '#fff',
+          border: '1px solid rgba(255,255,255,0.5)',
+          borderRadius: 3,
+          padding: '2px 6px',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          width: 249,
+          width: 237,
+          boxSizing: 'border-box',
         }}>
           {goal.goalName || '—'}
         </div>
@@ -277,13 +305,14 @@ function GoalRow({ goal, goalActions, onChartClick }) {
 }
 
 /* ─── Action sub-row — white background, vembu style ────────────────────────── */
-function ActionRow({ action, themeColor }) {
-  const pct      = Math.min(100, Number(action.actionGoalPercentAchieve || 0));
-  const endDate  = action.endDate || action.milestoneDate;
-  const planColor = themeColor || C.teal;
+function ActionRow({ action, themeColor, onSliderCommit }) {
+  const pct        = Math.min(100, Number(action.actionGoalPercentAchieve || 0));
+  const [localPct, setLocalPct] = useState(pct);
+  const endDate    = action.endDate || action.milestoneDate;
+  const planColor  = themeColor || C.teal;
 
   return (
-    <tr style={{ background: '#fff', borderBottom: `1px solid ${C.border}` }}>
+    <tr style={{ background: '#fff', borderBottom: `1px solid ${C.border}`, height: 32 }}>
       {/* Left color stripe — thin colored border matching plan color */}
       <td style={{ width: 4, background: planColor, padding: 0 }} />
 
@@ -323,14 +352,21 @@ function ActionRow({ action, themeColor }) {
         </div>
       </td>
 
-      {/* Action slider */}
+      {/* Action slider — MUI, draggable, saves on release */}
       <td style={{ padding: '0 4px' }}>
-        <ActionSlider pct={pct} />
+        <ActionSlider
+          pct={localPct}
+          onCommit={(dec) => {
+            const newPct = Math.round(dec * 100);
+            setLocalPct(newPct);
+            onSliderCommit && onSliderCommit(dec);
+          }}
+        />
       </td>
 
-      {/* % */}
+      {/* % — tracks local slider position */}
       <td style={{ padding: '0 6px', width: 60, textAlign: 'right', fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap' }}>
-        {pct.toFixed(1)}%
+        {localPct.toFixed(1)}%
       </td>
 
       {/* Due date / calendar icon */}
@@ -791,6 +827,22 @@ export default function WorkPlan() {
                     key={`a-${action.actionId || ai}`}
                     action={action}
                     themeColor={themeColor}
+                    onSliderCommit={(progress) => {
+                      api.updateActionProgress({
+                        updateDelete: 'PROGRESS',
+                        goalTagId: goal.goalTagId || goal.goalId,
+                        action: {
+                          actionTagId: action.actionTagId || action.actionId,
+                          growthPlanId: Number(planId),
+                          tagId: action.tagId,
+                          progress,
+                          ownerId: entityId,
+                          teamId: null,
+                        },
+                      })
+                        .then(() => queryClient.invalidateQueries(['planDetail', planId]))
+                        .catch(() => toast.error('Failed to save progress'));
+                    }}
                   />
                 )),
               ];

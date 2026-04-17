@@ -32,6 +32,7 @@ export const newGrowthPlan = (data) => http.post('/newGrowthPlan', data);
 export const updateGrowthPlan = (data) => http.post('/updateGrowthplanSummary', data);
 export const updateGoal = (data) => http.post('/updateGoal', data);
 export const updateAction = (data) => http.post('/updateAction', data);
+export const updateActionProgress = (data) => http.post('/updateActionProgress', data);
 export const updatePlansOrder = (data) => http.post('/updatePlansOrder', data);
 export const updateGoalsOrder = (data) => http.post('/updateGoalsOrder', data);
 export const updateActionsOrder = (data) => http.post('/updateActionsOrder', data);

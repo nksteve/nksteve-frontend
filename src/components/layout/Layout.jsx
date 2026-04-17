@@ -330,8 +330,8 @@ export default function Layout({ children }) {
         />
       </header>
 
-      {/* ── Secondary Nav Bar — navigation (replaces CoreUI sidebar from vembu) ── */}
-      <SecondaryNav currentPath={currentPath} />
+      {/* ── Secondary Nav Bar — hidden on /work-plan (vembu has no nav bar there) ── */}
+      {!currentPath.startsWith('/work-plan') && <SecondaryNav currentPath={currentPath} />}
 
       {/* ── Page content ── */}
       <main>
