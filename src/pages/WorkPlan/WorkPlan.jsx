@@ -316,7 +316,7 @@ function GoalRow({ goal, goalActions, onChartClick }) {
 }
 
 /* ─── Action sub-row — white background, vembu style ────────────────────────── */
-function ActionRow({ action, themeColor, onSliderCommit }) {
+function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisionClick }) {
   const pct        = Math.min(100, Number(action.actionGoalPercentAchieve || 0));
   const [localPct, setLocalPct] = useState(pct);
   const endDate    = action.endDate || action.milestoneDate;
@@ -355,11 +355,27 @@ function ActionRow({ action, themeColor, onSliderCommit }) {
         <YellowDot />
       </td>
 
-      {/* Bar chart + decision icons */}
+      {/* Bar chart + decision icons — clickable, matches vembu */}
       <td style={{ padding: '0 4px', width: 44 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <BarChart2 size={13} color={C.text2} />
-          <DecisionIcon color={C.text2} />
+          <button
+            onClick={onChartClick}
+            title="Chart"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: C.text2, display: 'flex', alignItems: 'center' }}
+            onMouseEnter={e => e.currentTarget.style.color = C.teal}
+            onMouseLeave={e => e.currentTarget.style.color = C.text2}
+          >
+            <BarChart2 size={13} />
+          </button>
+          <button
+            onClick={onDecisionClick}
+            title="Decision / HeadsUp"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: C.text2, display: 'flex', alignItems: 'center' }}
+            onMouseEnter={e => e.currentTarget.style.color = C.purple}
+            onMouseLeave={e => e.currentTarget.style.color = C.text2}
+          >
+            <DecisionIcon color="currentColor" />
+          </button>
         </div>
       </td>
 
@@ -402,8 +418,8 @@ const MODAL_TABS = [
   { id: 'headsup',  Icon: MessageCircle,  label: 'HeadsUp' },
 ];
 
-function GoalChartModal({ goal, goalActions, onClose }) {
-  const [modalTab, setModalTab] = useState('chart');
+function GoalChartModal({ goal, goalActions, onClose, initialTab = 'chart' }) {
+  const [modalTab, setModalTab] = useState(initialTab);
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
@@ -831,13 +847,15 @@ export default function WorkPlan() {
                   key={`g-${goal.goalId || gi}`}
                   goal={goal}
                   goalActions={goalActions}
-                  onChartClick={(g, ga) => setChartGoal({ goal: g, goalActions: ga })}
+                  onChartClick={(g, ga) => setChartGoal({ goal: g, goalActions: ga, initialTab: 'chart' })}
                 />,
                 ...visibleActions.map((action, ai) => (
                   <ActionRow
                     key={`a-${action.actionId || ai}`}
                     action={action}
                     themeColor={themeColor}
+                    onChartClick={() => setChartGoal({ goal, goalActions, initialTab: 'chart' })}
+                    onDecisionClick={() => setChartGoal({ goal, goalActions, initialTab: 'decision' })}
                     onSliderCommit={(progress) => {
                       api.updateActionProgress({
                         updateDelete: 'PROGRESS',
@@ -874,6 +892,7 @@ export default function WorkPlan() {
         <GoalChartModal
           goal={chartGoal.goal}
           goalActions={chartGoal.goalActions}
+          initialTab={chartGoal.initialTab || 'chart'}
           onClose={() => setChartGoal(null)}
         />
       )}
