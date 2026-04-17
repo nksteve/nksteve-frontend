@@ -164,7 +164,7 @@ export default function Layout({ children }) {
   const currentPath = location.pathname;
 
   return (
-    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: 'acumin-pro, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif' }}>
       {/* ── Top Header ────────────────────────────────────────────────────────── */}
       <header style={{
         position: 'sticky', top: 0, zIndex: 1000,
