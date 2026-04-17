@@ -262,28 +262,33 @@ function GoalRow({ goal, goalActions, onChartClick }) {
       {/* Left color stripe */}
       <td style={{ width: 4, background: bgcolor, padding: 0 }} />
 
-      {/* Checkbox + folder-open + note icons (matches vembu: checkbox → note → folder-open) */}
-      <td style={{ padding: '0 4px', width: 52 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-          <Checkbox />
-          <NoteIcon color="rgba(255,255,255,0.75)" />
-          <FolderIcon color="rgba(255,255,255,0.85)" />
-        </div>
+      {/* Checkbox only on left */}
+      <td style={{ padding: '0 4px', width: 24 }}>
+        <Checkbox />
       </td>
 
-      {/* Goal name — vembu: white input-box style on the purple band */}
-      <td style={{ padding: '0 6px', width: 249 }}>
+      {/* Goal name box with note + folder icons on the RIGHT — matches vembu */}
+      <td style={{ padding: '0 4px', width: 277 }}>
         <div style={{
+          display: 'flex', alignItems: 'center',
           fontSize: 13, fontWeight: 600, color: C.text,
           background: '#fff',
           border: '1px solid rgba(255,255,255,0.5)',
           borderRadius: 3,
-          padding: '2px 6px',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          width: 237,
+          padding: '2px 4px 2px 6px',
+          width: 265,
           boxSizing: 'border-box',
         }}>
-          {goal.goalName || '—'}
+          <span style={{
+            flex: 1,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {goal.goalName || '—'}
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 4 }}>
+            <NoteIcon color={C.teal} />
+            <FolderIcon color={C.teal} />
+          </div>
         </div>
       </td>
 
@@ -342,27 +347,32 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
       {/* Left color stripe — thin colored border matching plan color */}
       <td style={{ width: 4, background: planColor, padding: 0 }} />
 
-      {/* Checkbox + note + folder-open icons (matches vembu action row) */}
-      <td style={{ padding: '0 4px', width: 52 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-          <Checkbox />
-          <NoteIcon color={planColor} />
-          <FolderIcon color={planColor} />
-        </div>
+      {/* Checkbox only on left */}
+      <td style={{ padding: '0 4px', width: 24 }}>
+        <Checkbox />
       </td>
 
-      {/* Action name — vembu: white input box, plain black text */}
-      <td style={{ padding: '0 6px', width: 249 }}>
+      {/* Action name box with note + folder icons on the RIGHT — matches vembu */}
+      <td style={{ padding: '0 4px', width: 277 }}>
         <div style={{
-          fontSize: 12.5, color: C.text,
+          display: 'flex', alignItems: 'center',
           background: '#fff',
           border: '1px solid #c8ced3',
           borderRadius: 3,
-          padding: '2px 6px',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          width: 237,
+          padding: '2px 4px 2px 6px',
+          width: 265,
         }}>
-          {action.actionName || '—'}
+          <span style={{
+            fontSize: 12.5, color: C.text,
+            flex: 1,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {action.actionName || '—'}
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 4 }}>
+            <NoteIcon color={planColor} />
+            <FolderIcon color={planColor} />
+          </div>
         </div>
       </td>
 
