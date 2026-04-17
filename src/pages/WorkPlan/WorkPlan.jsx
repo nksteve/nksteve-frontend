@@ -292,13 +292,8 @@ function GoalRow({ goal, goalActions, onChartClick }) {
         </div>
       </td>
 
-      {/* Yellow dot */}
-      <td style={{ padding: '0 4px', width: 20 }}>
-        <YellowDot />
-      </td>
-
       {/* Bar chart + decision icons */}
-      <td style={{ padding: '0 4px', width: 44 }}>
+      <td style={{ padding: '0 4px', width: 64 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <button
             onClick={() => onChartClick && onChartClick(goal, goalActions)}
@@ -377,13 +372,8 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
         </div>
       </td>
 
-      {/* Yellow dot */}
-      <td style={{ padding: '0 4px', width: 20 }}>
-        <YellowDot />
-      </td>
-
       {/* Bar chart + decision icons — clickable, matches vembu */}
-      <td style={{ padding: '0 4px', width: 44 }}>
+      <td style={{ padding: '0 4px', width: 64 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <button
             onClick={onChartClick}
@@ -939,8 +929,7 @@ export default function WorkPlan() {
             <col style={{ width: 4 }} />
             <col style={{ width: 24 }} />
             <col style={{ width: 277 }} />
-            <col style={{ width: 20 }} />
-            <col style={{ width: 48 }} />
+            <col style={{ width: 64 }} />
             <col />
             <col style={{ width: 66 }} />
             <col style={{ width: 120 }} />
