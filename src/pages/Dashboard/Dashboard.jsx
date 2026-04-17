@@ -280,7 +280,7 @@ export default function Dashboard() {
   const entityId   = user?.entityId;
   const companyId  = user?.companyId;
 
-  const [activeTab, setActiveTab] = useState('3');  // Default to 'Invited' tab
+  const [activeTab, setActiveTab] = useState('1');  // Default to 'Goal Plans' tab (matches vembu)
   const [showModal,  setShowModal]  = useState(false);
   const [search,     setSearch]     = useState('');
 

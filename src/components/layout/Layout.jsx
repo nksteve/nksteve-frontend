@@ -96,6 +96,11 @@ function UserDropdown({ user, setupData, onLogout, isAdmin }) {
               <i style={{ width: 18, display: 'inline-block' }}>📊</i> Reporting
             </button>
           )}
+          {isAdmin && (
+            <button onClick={() => { setOpen(false); navigate('/userManagement'); }} style={dropItemStyle}>
+              <i style={{ width: 18, display: 'inline-block' }}>➕</i> Add User
+            </button>
+          )}
           <button onClick={() => { setOpen(false); onLogout(); }} style={{ ...dropItemStyle, color: '#dc3545', borderTop: `1px solid ${C.border}` }}>
             <i style={{ width: 18, display: 'inline-block' }}>🚪</i> Logout
           </button>
