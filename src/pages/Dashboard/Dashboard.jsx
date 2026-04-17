@@ -338,7 +338,7 @@ export default function Dashboard() {
   const fullName= setupData ? `${setupData.firstName || ''} ${setupData.lastName || ''}`.trim() : '';
 
   return (
-    <div style={{ background: C.bg, minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif' }}>
+    <div style={{ background: C.bg, minHeight: '100vh', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif" }}>
       {/* ── Vision / Mission / Values ─────────────────────────────────────── */}
       <div style={{ padding: '16px 24px 0' }}>
         <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
