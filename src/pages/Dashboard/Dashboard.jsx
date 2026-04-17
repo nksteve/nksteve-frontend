@@ -166,9 +166,14 @@ function VMVCard({ title, content, initial, onSave }) {
               }}>Cancel</button>
             </div>
           </>
+        ) : val ? (
+          <div
+            style={{ fontSize: 14, color: C.text, margin: 0, lineHeight: 1.6 }}
+            dangerouslySetInnerHTML={{ __html: val }}
+          />
         ) : (
-          <p style={{ fontSize: 14, color: C.text, margin: 0, lineHeight: 1.6 }}>
-            {val || <em style={{ color: C.grey }}>Click ✎ to add {title.toLowerCase()}…</em>}
+          <p style={{ fontSize: 14, color: C.grey, margin: 0, fontStyle: 'italic' }}>
+            Click ✎ to add {title.toLowerCase()}…
           </p>
         )}
       </div>
@@ -329,9 +334,11 @@ export default function Dashboard() {
 
   const visiblePlans = filterByTab(activeTab);
 
-  const vision  = setupData?.vission      || setupData?.companyVision  || '';
-  const mission = setupData?.mission      || setupData?.companyMission || '';
-  const values  = setupData?.value        || setupData?.companyValues  || '';
+  // Strip trailing " - " artifacts that vembu sometimes appends to HTML content
+  const cleanHtml = (s) => (s || '').replace(/\s*-\s*$/, '').trim();
+  const vision  = cleanHtml(setupData?.vission  || setupData?.companyVision  || '');
+  const mission = cleanHtml(setupData?.mission  || setupData?.companyMission || '');
+  const values  = cleanHtml(setupData?.value    || setupData?.companyValues  || '');
   const company = setupData?.companyName  || user?.email || '';
   const fullName= setupData ? `${setupData.firstName || ''} ${setupData.lastName || ''}`.trim() : '';
 
