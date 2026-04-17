@@ -1,4 +1,16 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import SlickSlider from 'react-slick';
+import 'slick-carousel/slick/slick.css';
+import 'slick-carousel/slick/slick-theme.css';
+import uploadImg  from '../../assets/upload.png';
+import linkImg    from '../../assets/link.png';
+import linkImage  from '../../assets/link-image.png';
+import wordImage  from '../../assets/word-image.png';
+import pdfImage   from '../../assets/pdf-image.png';
+import pptImage   from '../../assets/ppt-image.png';
+import excelImage from '../../assets/excel-image.png';
+import playImage  from '../../assets/play-button.png';
+import noImage    from '../../assets/noimage.png';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
@@ -446,10 +458,16 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
 /* ─── Notes Modal ──────────────────────────────────────────────────────────────────── */
 function NotesModal({ onClose, growthPlanId, goalTagId, actionTagId, planColor }) {
   const user = useAuthStore(s => s.user);
-  const [notes, setNotes]   = useState([]);
-  const [text, setText]     = useState('');
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving]   = useState(false);
+  const [notes, setNotes]         = useState([]);
+  const [text, setText]           = useState('');
+  const [loading, setLoading]     = useState(true);
+  const [saving, setSaving]       = useState(false);
+  const [editId, setEditId]       = useState(null);   // notesId being edited
+  const [editText, setEditText]   = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // notesId pending delete
+  // filters
+  const [filterText, setFilterText]   = useState('');
+  const [filterDate, setFilterDate]   = useState('');
   const title = actionTagId ? 'Action Notes' : 'Goal Notes';
 
   useEffect(() => { fetchNotes(); }, []);
@@ -478,72 +496,160 @@ function NotesModal({ onClose, growthPlanId, goalTagId, actionTagId, planColor }
     setSaving(false);
   }
 
-  async function deleteNote(notesId) {
+  async function confirmDelete() {
+    const notesId = deleteConfirm;
+    setDeleteConfirm(null);
     try {
       await api.updateGoalActionNotes({ action: 'DELETE', growthPlanId, notesId });
       setNotes(prev => prev.filter(n => n.notesId !== notesId));
     } catch(e) { toast.error('Failed to delete note'); }
   }
 
+  async function saveEdit(notesId) {
+    if (!editText.trim()) return;
+    try {
+      const res = await api.updateGoalActionNotes({
+        action: 'UPDATE', growthPlanId, goalTagId, actionTagId,
+        notesId, notes: `<p>${editText}</p>-`, notesType: 'public',
+      });
+      setNotes(res.data.result || []);
+      setEditId(null); setEditText('');
+    } catch(e) { toast.error('Failed to update note'); }
+  }
+
+  // client-side filter
+  const visibleNotes = notes.filter(n => {
+    const matchText = !filterText || stripHtml(n.notes).toLowerCase().includes(filterText.toLowerCase());
+    const matchDate = !filterDate || (n.created || '').startsWith(filterDate);
+    return matchText && matchDate;
+  });
+
   const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' };
-  const modal   = { background: '#fff', borderRadius: 8, width: 560, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' };
-  const header  = { background: planColor || C.teal, color: '#fff', padding: '14px 20px', borderRadius: '8px 8px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' };
+  // vembu: large modal, blue outer border
+  const modal   = { background: '#fff', borderRadius: 8, width: 660, maxHeight: '85vh', display: 'flex', flexDirection: 'column', border: '5px solid #20a8d8', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' };
 
   return (
     <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={modal}>
-        <div style={header}>
-          <span style={{ fontWeight: 700, fontSize: 16 }}>{title}</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>×</button>
+        {/* Header — matches vembu ModalHeader style */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 20px', borderBottom:'1px solid #e8e8e8' }}>
+          <span style={{ fontWeight: 700, fontSize: 16, color: '#333' }}>{title}</span>
+          <button onClick={onClose} style={{ background:'none', border:'none', fontSize:22, cursor:'pointer', color:'#666', lineHeight:1 }}>×</button>
         </div>
-        <div style={{ padding: 16, borderBottom: '1px solid #e8e8e8' }}>
+
+        {/* Filter bar — matches vembu search row */}
+        <div style={{ display:'flex', gap:8, padding:'10px 16px', borderBottom:'1px solid #e8e8e8', flexWrap:'wrap' }}>
+          <input
+            type="text" placeholder="Search..."
+            value={filterText} onChange={e => setFilterText(e.target.value)}
+            style={{ flex:1, minWidth:120, border:'1px solid #c8ced3', borderRadius:4, padding:'5px 9px', fontSize:12 }}
+          />
+          <input
+            type="date"
+            value={filterDate} onChange={e => setFilterDate(e.target.value)}
+            style={{ border:'1px solid #c8ced3', borderRadius:4, padding:'5px 9px', fontSize:12 }}
+          />
+          {(filterText || filterDate) && (
+            <button onClick={() => { setFilterText(''); setFilterDate(''); }}
+              style={{ background:'#6c757d', color:'#fff', border:'none', borderRadius:4, padding:'5px 12px', fontSize:12, cursor:'pointer' }}>Reset</button>
+          )}
+        </div>
+
+        {/* Add note box */}
+        <div style={{ padding:'12px 16px', borderBottom:'1px solid #e8e8e8' }}>
           <div style={{ display: 'flex', gap: 8 }}>
             <textarea
-              value={text}
-              onChange={e => setText(e.target.value)}
+              value={text} onChange={e => setText(e.target.value)}
               placeholder="Add a note..."
               rows={3}
-              style={{ flex: 1, border: '1px solid #c8ced3', borderRadius: 4, padding: '6px 10px', fontSize: 13, resize: 'vertical', fontFamily: 'inherit' }}
+              style={{ flex:1, border:'1px solid #c8ced3', borderRadius:4, padding:'6px 10px', fontSize:13, resize:'vertical', fontFamily:'inherit' }}
             />
-            <button
-              onClick={saveNote}
-              disabled={saving || !text.trim()}
-              style={{ background: planColor || C.teal, color: '#fff', border: 'none', borderRadius: 4, padding: '0 16px', cursor: 'pointer', fontWeight: 600, fontSize: 13, opacity: saving || !text.trim() ? 0.6 : 1 }}
+            <button onClick={saveNote} disabled={saving || !text.trim()}
+              style={{ background: planColor || C.teal, color:'#fff', border:'none', borderRadius:4, padding:'0 16px', cursor:'pointer', fontWeight:600, fontSize:13, opacity: saving || !text.trim() ? 0.6 : 1 }}
             >{saving ? 'Saving...' : 'Save'}</button>
           </div>
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
-          {loading ? <div style={{ textAlign: 'center', color: C.text2, padding: 24 }}>Loading...</div>
-          : notes.length === 0 ? <div style={{ textAlign: 'center', color: C.text2, padding: 24, fontSize: 13 }}>No notes yet.</div>
-          : notes.map(n => (
-            <div key={n.notesId} style={{ marginBottom: 12, padding: '10px 14px', background: '#f8f9fa', borderRadius: 6, borderLeft: `3px solid ${planColor || C.teal}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontSize: 11, color: C.text2 }}>{new Date(n.created).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                {n.entityId === user?.entityId && (
-                  <button onClick={() => deleteNote(n.notesId)} style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer', fontSize: 12, padding: 0 }}>Delete</button>
-                )}
-              </div>
-              <div style={{ fontSize: 13, color: C.text }} children={stripHtml(n.notes)} />
-            </div>
-          ))}
+
+        {/* Notes list */}
+        <div style={{ flex:1, overflowY:'auto' }}>
+          {loading
+            ? <div style={{ textAlign:'center', color:C.text2, padding:24 }}>Loading...</div>
+            : visibleNotes.length === 0
+              ? <div style={{ textAlign:'center', color:C.text2, padding:24, fontSize:13 }}>No Record Found</div>
+              : visibleNotes.map(n => (
+                <div key={n.notesId} style={{ padding:'12px 20px', borderTop:'1px solid #e8e8e8' }}>
+                  {/* name row */}
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                    <span style={{ fontWeight:700, color:'#20a8d8', fontSize:14 }}>
+                      {n.firstName || ''} {n.lastName || ''}
+                    </span>
+                    {Number(n.entityId) === Number(user?.entityId) && editId !== n.notesId && (
+                      <div style={{ display:'flex', gap:8 }}>
+                        <button onClick={() => { setEditId(n.notesId); setEditText(stripHtml(n.notes)); }}
+                          style={{ background:'none', border:'none', cursor:'pointer', color:'#20a8d8', fontSize:13, padding:0 }}>✏ Edit</button>
+                        <button onClick={() => setDeleteConfirm(n.notesId)}
+                          style={{ background:'none', border:'none', cursor:'pointer', color:'#dc3545', fontSize:13, padding:0 }}>🗑 Delete</button>
+                      </div>
+                    )}
+                    {editId === n.notesId && (
+                      <div style={{ display:'flex', gap:6 }}>
+                        <button onClick={() => saveEdit(n.notesId)}
+                          style={{ background:'#28a745', color:'#fff', border:'none', borderRadius:4, padding:'3px 12px', fontSize:12, cursor:'pointer' }}>Save</button>
+                        <button onClick={() => { setEditId(null); setEditText(''); }}
+                          style={{ background:'#20a8d8', color:'#fff', border:'none', borderRadius:4, padding:'3px 12px', fontSize:12, cursor:'pointer' }}>Cancel</button>
+                      </div>
+                    )}
+                  </div>
+                  {/* timestamp */}
+                  <p style={{ fontSize:13, color:'#555', margin:'2px 0 6px' }}>
+                    {n.created ? new Date(n.created).toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' }) : ''}
+                  </p>
+                  {/* note body */}
+                  <div style={{ marginLeft:20 }}>
+                    <span style={{ fontWeight:700, color:'#28a745', fontSize:13 }}>Plan Notes</span>
+                    {editId === n.notesId
+                      ? <textarea value={editText} onChange={e => setEditText(e.target.value)} rows={3}
+                          style={{ display:'block', width:'100%', marginTop:4, border:'1px solid #c8ced3', borderRadius:4, padding:'5px 8px', fontSize:13, resize:'vertical', fontFamily:'inherit' }} />
+                      : <div style={{ fontSize:13, color:'#333', marginTop:2 }}>{stripHtml(n.notes)}</div>
+                    }
+                  </div>
+                </div>
+              ))
+          }
         </div>
       </div>
+
+      {/* Delete confirmation popup — matches vembu CustomModalPopup */}
+      {deleteConfirm && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <div style={{ background:'#fff', borderRadius:8, width:420, padding:24, boxShadow:'0 8px 32px rgba(0,0,0,0.25)' }}>
+            <p style={{ fontSize:14, color:'#333', marginBottom:20 }}>
+              You are about to delete this Note. Deleting the Note cannot be undone. Would you like to continue?
+            </p>
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+              <button onClick={() => setDeleteConfirm(null)}
+                style={{ background:'#6c757d', color:'#fff', border:'none', borderRadius:4, padding:'7px 20px', cursor:'pointer', fontSize:13 }}>Cancel</button>
+              <button onClick={confirmDelete}
+                style={{ background:'#20a8d8', color:'#fff', border:'none', borderRadius:4, padding:'7px 20px', cursor:'pointer', fontSize:13, fontWeight:600 }}>Ok</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-/* ─── Files Modal ───────────────────────────────────────────────────────────────────── */
 /* ─── FilesModal ─ two tabs: Upload + Attachment (matches vembu GoalFiles) ─── */
 function FilesModal({ onClose, growthPlanId, goalTagId, actionTagId, planColor }) {
   const [docs, setDocs]           = useState([]);
   const [loading, setLoading]     = useState(true);
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState('upload');  // 'upload' | 'attachment'
-  const [linkMode, setLinkMode]   = useState(false);     // show link form inside Upload tab
+  const [linkMode, setLinkMode]   = useState(false);
   const [linkUrl, setLinkUrl]     = useState('');
   const [linkName, setLinkName]   = useState('');
-  const title = actionTagId ? 'Action Files' : 'Goal Files';
-  const accent = planColor || C.teal;
+  const sliderRef = useRef(null);
+  const title  = actionTagId ? 'Action Files' : 'Goal Files';
   const user   = useAuthStore(s => s.user);
 
   useEffect(() => { fetchDocs(); }, []);
@@ -557,7 +663,6 @@ function FilesModal({ onClose, growthPlanId, goalTagId, actionTagId, planColor }
     setLoading(false);
   }
 
-  /* ── File upload via <input type=file> → /api/fileUpload → /api/updateGoalfile ── */
   async function handleFileChange(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -566,7 +671,6 @@ function FilesModal({ onClose, growthPlanId, goalTagId, actionTagId, planColor }
     if (!allowed.includes(ext)) { toast.error('File format not supported'); return; }
     setUploading(true);
     try {
-      // 1. Upload to S3 via backend
       const formData = new FormData();
       formData.append('file', file);
       formData.append('entityId', String(user?.entityId || ''));
@@ -579,7 +683,6 @@ function FilesModal({ onClose, growthPlanId, goalTagId, actionTagId, planColor }
       });
       if (!uploadRes.ok) throw new Error(await uploadRes.text());
       const { Location } = await uploadRes.json();
-      // 2. Save metadata to documents table
       const saveRes = await api.updateGoalfile({
         action: 'ADD', growthPlanId, goalTagId, actionTagId,
         fileName: file.name, fileUrl: Location,
@@ -595,7 +698,6 @@ function FilesModal({ onClose, growthPlanId, goalTagId, actionTagId, planColor }
     e.target.value = '';
   }
 
-  /* ── Share a link ── */
   async function saveLink() {
     if (!linkUrl.trim() || !linkName.trim()) { toast.error('Please enter both URL and description'); return; }
     setUploading(true);
@@ -618,46 +720,59 @@ function FilesModal({ onClose, growthPlanId, goalTagId, actionTagId, planColor }
     } catch(e) { toast.error('Failed to delete'); }
   }
 
-  function fileThumb(url, name) {
-    if (!url || !name) return null;
-    const ext = name.split('.').pop().toLowerCase();
-    if (['jpg','jpeg','png','gif'].includes(ext)) return url;
-    return null;
+  // Matches vembu's thumbnail logic exactly
+  function getThumbSrc(fileUrl, fileName) {
+    if (!fileName) return noImage;
+    const ext = fileName.toLowerCase().split('.').pop();
+    if (['jpeg','jpg','gif','png'].includes(ext)) return fileUrl || noImage;
+    if (ext === 'pdf') return pdfImage;
+    if (['mp4','mkv','3gp'].includes(ext)) return playImage;
+    if (['docx','doc','docm'].includes(ext)) return wordImage;
+    if (ext === 'pptx') return pptImage;
+    if (['xlsx','xls','xlsm'].includes(ext)) return excelImage;
+    return linkImage;
   }
 
-  function fileTypeIcon(name) {
-    if (!name) return '📎';
-    const ext = name.split('.').pop().toLowerCase();
-    if (['jpg','jpeg','png','gif'].includes(ext)) return '🖼';
-    if (ext === 'pdf') return '📄';
-    if (['doc','docx','docm'].includes(ext)) return '📝';
-    if (['xls','xlsx','xlsm'].includes(ext)) return '📊';
-    if (['ppt','pptx'].includes(ext)) return '📋';
-    if (['mp4','mkv','3gp'].includes(ext)) return '▶';
-    return '🔗';
+  function openDoc(fileUrl, fileName) {
+    if (!fileUrl) return;
+    const ext = (fileName || '').toLowerCase().split('.').pop();
+    if (['docx','doc','docm','pptx'].includes(ext)) {
+      window.open(`https://docs.google.com/viewerng/viewer?url=${fileUrl}&embedded=true`);
+    } else {
+      window.open(fileUrl);
+    }
   }
 
-  const overlay = { position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center' };
-  const modal   = { background:'#fff', borderRadius:8, width:520, maxHeight:'82vh', display:'flex', flexDirection:'column', boxShadow:'0 8px 32px rgba(0,0,0,0.22)' };
+  const slideCount = docs.length === 2 ? 2 : 3;
+  const slickSettings = {
+    infinite: false, speed: 500,
+    slidesToShow: Math.min(slideCount, docs.length || 1),
+    slidesToScroll: Math.min(slideCount, docs.length || 1),
+  };
+
+  const overlay  = { position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center' };
+  // vembu: white bg, no colored header — uses plain ModalHeader
+  const modal    = { background:'#fff', borderRadius:8, width:520, maxHeight:'82vh', display:'flex', flexDirection:'column', boxShadow:'0 8px 32px rgba(0,0,0,0.22)' };
+
+  // vembu tab style: just color change, double bottom border on tab row, no underline on tab itself
+  const tabRowStyle = { display:'flex', borderBottom:'3px double #dee2e6', padding:'0 8px' };
   const tabStyle = (active) => ({
-    padding:'8px 18px', cursor:'pointer', fontSize:13, fontWeight:600,
-    borderBottom: active ? `2px solid ${accent}` : '2px solid transparent',
-    color: active ? accent : '#555', background:'none', border:'none',
-    borderBottom: active ? `2px solid ${accent}` : '2px solid transparent',
+    padding:'8px 16px', cursor:'pointer', fontSize:14,
+    color: active ? 'blue' : '#333',
+    background:'none', border:'none', fontWeight: active ? 600 : 400,
   });
 
   return (
     <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={modal}>
-        {/* Header */}
-        <div style={{ background: accent, color:'#fff', padding:'13px 18px', borderRadius:'8px 8px 0 0', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <span style={{ fontWeight:700, fontSize:15 }}>{title}</span>
-          <button onClick={onClose} style={{ background:'none', border:'none', color:'#fff', cursor:'pointer', fontSize:20, lineHeight:1 }}>×</button>
+        {/* Header — plain like vembu ModalHeader (no colored bg) */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', padding:'8px 12px', borderBottom:'1px solid #e0e0e0' }}>
+          <button onClick={onClose} style={{ background:'none', border:'none', fontSize:22, cursor:'pointer', color:'#666', lineHeight:1 }}>×</button>
         </div>
 
-        {/* Tabs */}
-        <div style={{ display:'flex', borderBottom:'1px solid #e0e0e0', padding:'0 16px' }}>
-          <button style={tabStyle(activeTab==='upload')}    onClick={() => { setActiveTab('upload');    setLinkMode(false); }}>Upload</button>
+        {/* Tabs — double bottom border like vembu */}
+        <div style={tabRowStyle}>
+          <button style={tabStyle(activeTab==='upload')}   onClick={() => { setActiveTab('upload'); setLinkMode(false); }}>Upload</button>
           <button style={tabStyle(activeTab==='attachment')} onClick={() => setActiveTab('attachment')}>Attachment</button>
         </div>
 
@@ -668,44 +783,47 @@ function FilesModal({ onClose, growthPlanId, goalTagId, actionTagId, planColor }
           {activeTab === 'upload' && (
             <div style={{ padding:24 }}>
               {!linkMode ? (
-                <div style={{ display:'flex', gap:24, justifyContent:'center', alignItems:'flex-start' }}>
-                  {/* Upload from computer */}
-                  <label style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:10, width:200, cursor:'pointer' }}>
-                    <div style={{ width:80, height:80, background:'#e8f4fb', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:36 }}>
-                      {uploading ? '⏳' : '⬆'}
-                    </div>
-                    <span style={{ fontSize:13, fontWeight:600, color:C.text, textAlign:'center' }}>Upload files from your computer</span>
-                    <span style={{ fontSize:11, color:C.text2, textAlign:'center' }}>(Supports images, pdf, docx, pptx, xlsx)</span>
-                    <input type="file" style={{ display:'none' }} onChange={handleFileChange} disabled={uploading}
-                      accept=".jpeg,.jpg,.gif,.png,.pdf,.mp4,.mkv,.3gp,.doc,.docx,.docm,.pptx,.xls,.xlsx,.xlsm" />
-                  </label>
-                  {/* Share a link */}
-                  <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:10, width:180, cursor:'pointer' }}
+                <div style={{ display:'flex', justifyContent:'center' }}>
+                  {/* Upload from computer — real vembu upload.png */}
+                  <div className="upload-card" style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:8, width:'50%', cursor:'pointer' }}>
+                    <label style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:8, cursor:'pointer', position:'relative' }}>
+                      {uploading
+                        ? <i className="fa fa-spinner fa-spin" style={{ fontSize:50 }} />
+                        : <img src={uploadImg} alt="upload" style={{ width:60, height:60, cursor:'pointer' }} />
+                      }
+                      <span style={{ fontSize:13, textAlign:'center', color:'#333' }}>Upload files from your computer</span>
+                      <span style={{ fontSize:11, color:'#888', textAlign:'center' }}>(Supports images, pdf, docx, pptx, xlsx)</span>
+                      <input type="file" style={{ position:'absolute', inset:0, opacity:0, cursor:'pointer', width:'100%', height:'100%' }}
+                        onChange={handleFileChange} disabled={uploading}
+                        accept=".jpeg,.jpg,.gif,.png,.pdf,.mp4,.mkv,.3gp,.doc,.docx,.docm,.pptx,.xls,.xlsx,.xlsm" />
+                    </label>
+                  </div>
+                  {/* Share a link — real vembu link.png */}
+                  <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:8, width:'50%', cursor:'pointer' }}
                     onClick={() => setLinkMode(true)}>
-                    <div style={{ width:80, height:80, background:'#f0faf0', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:36 }}>🔗</div>
-                    <span style={{ fontSize:13, fontWeight:600, color:C.text, textAlign:'center' }}>For large files share a link here</span>
+                    <img src={linkImg} alt="link" style={{ width:60, height:60 }} />
+                    <span style={{ fontSize:13, textAlign:'center', color:'#333' }}>For large file share a link here</span>
                   </div>
                 </div>
               ) : (
-                /* Link form */
+                /* Link form — matches vembu exactly */
                 <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-                  <div>
-                    <label style={{ fontSize:13, fontWeight:600, color:C.text, display:'block', marginBottom:4 }}>URL:</label>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <label style={{ width:90, fontSize:13, fontWeight:600, color:'#333' }}>URL:</label>
                     <input value={linkUrl} onChange={e => setLinkUrl(e.target.value)}
-                      placeholder="https://..." style={{ width:'100%', boxSizing:'border-box', border:'1px solid #c8ced3', borderRadius:4, padding:'7px 10px', fontSize:13 }} />
+                      style={{ flex:1, border:'1px solid #0197cc', borderRadius:4, padding:'6px 10px', fontSize:13 }} />
                   </div>
-                  <div>
-                    <label style={{ fontSize:13, fontWeight:600, color:C.text, display:'block', marginBottom:4 }}>Description:</label>
-                    <textarea value={linkName} onChange={e => setLinkName(e.target.value)}
-                      rows={3} placeholder="Describe the link..."
-                      style={{ width:'100%', boxSizing:'border-box', border:'1px solid #c8ced3', borderRadius:4, padding:'7px 10px', fontSize:13, resize:'vertical' }} />
+                  <div style={{ display:'flex', alignItems:'flex-start', gap:8 }}>
+                    <label style={{ width:90, fontSize:13, fontWeight:600, color:'#333', paddingTop:6 }}>Description:</label>
+                    <textarea value={linkName} onChange={e => setLinkName(e.target.value)} rows={3}
+                      style={{ flex:1, border:'1px solid #0197cc', borderRadius:4, padding:'6px 10px', fontSize:13, resize:'vertical' }} />
                   </div>
                   <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
                     <button onClick={() => setLinkMode(false)}
-                      style={{ background:'none', border:'none', color:accent, cursor:'pointer', fontSize:13, fontWeight:600 }}>Back</button>
+                      style={{ background:'none', border:'none', color:'#20a8d8', cursor:'pointer', fontSize:13, fontWeight:600 }}>Back</button>
                     <button onClick={saveLink} disabled={uploading}
-                      style={{ background:accent, color:'#fff', border:'none', borderRadius:4, padding:'7px 20px', cursor:'pointer', fontWeight:600, fontSize:13 }}>
-                      {uploading ? 'Saving...' : 'Share Link'}
+                      style={{ background:'#20a8d8', color:'#fff', border:'none', borderRadius:4, padding:'6px 18px', cursor:'pointer', fontWeight:600, fontSize:13 }}>
+                      {uploading ? <i className="fa fa-spinner fa-spin" style={{ fontSize:10 }} /> : 'Share Link'}
                     </button>
                   </div>
                 </div>
@@ -713,28 +831,44 @@ function FilesModal({ onClose, growthPlanId, goalTagId, actionTagId, planColor }
             </div>
           )}
 
-          {/* ── ATTACHMENT TAB ── */}
+          {/* ── ATTACHMENT TAB ── — slick carousel like vembu */}
           {activeTab === 'attachment' && (
-            <div style={{ padding:16 }}>
+            <div style={{ width:473, padding:'12px 8px', position:'relative' }}>
               {loading ? (
                 <div style={{ textAlign:'center', color:C.text2, padding:32, fontSize:13 }}>Loading...</div>
               ) : docs.length === 0 ? (
                 <div style={{ textAlign:'center', color:C.text2, padding:32, fontSize:13 }}>No attachments yet.</div>
               ) : (
-                docs.map(d => (
-                  <div key={d.documentId} style={{ display:'flex', alignItems:'center', gap:12, marginBottom:10, padding:'9px 12px', background:'#f8f9fa', borderRadius:6, borderLeft:`3px solid ${accent}` }}>
-                    <span style={{ fontSize:22, flexShrink:0 }}>{fileTypeIcon(d.fileName)}</span>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <a href={d.fileUrl} target="_blank" rel="noreferrer"
-                        style={{ fontSize:13, color:accent, fontWeight:600, textDecoration:'none', display:'block', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                        {d.fileName}
-                      </a>
-                      <span style={{ fontSize:11, color:C.text2 }}>{new Date(d.created).toLocaleDateString()}</span>
+                <>
+                  <SlickSlider {...slickSettings} ref={sliderRef}>
+                    {docs.map((d, i) => (
+                      <div key={d.documentId} style={{ height:120 }}
+                        className="d-flex flex-column align-items-center justify-content-center doc-popup-img position-relative">
+                        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:120, position:'relative' }}>
+                          <img
+                            src={getThumbSrc(d.fileUrl, d.fileName)}
+                            alt={d.fileName}
+                            onClick={() => openDoc(d.fileUrl, d.fileName)}
+                            style={{ width:80, height:80, objectFit:'contain', cursor:'pointer' }}
+                          />
+                          <button onClick={() => deleteDoc(d.documentId)}
+                            style={{ position:'absolute', top:0, right:8, background:'none', border:'none', cursor:'pointer', color:'#333', fontSize:13, lineHeight:1 }}>×</button>
+                          <p style={{ fontSize:12, textAlign:'center', marginTop:4, maxWidth:110, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', color:'#333' }}>
+                            {d.fileName || d.name}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </SlickSlider>
+                  {docs.length > 3 && (
+                    <div style={{ display:'flex', justifyContent:'space-between', position:'absolute', top:'35%', left:0, right:0, pointerEvents:'none' }}>
+                      <button onClick={() => sliderRef.current?.slickPrev()}
+                        style={{ pointerEvents:'all', background:'none', border:'none', cursor:'pointer', fontSize:18, padding:4 }}>←</button>
+                      <button onClick={() => sliderRef.current?.slickNext()}
+                        style={{ pointerEvents:'all', background:'none', border:'none', cursor:'pointer', fontSize:18, padding:4 }}>→</button>
                     </div>
-                    <button onClick={() => deleteDoc(d.documentId)}
-                      style={{ background:'none', border:'none', color:'#dc3545', cursor:'pointer', fontSize:12, flexShrink:0 }}>Remove</button>
-                  </div>
-                ))
+                  )}
+                </>
               )}
             </div>
           )}
