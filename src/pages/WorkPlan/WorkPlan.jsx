@@ -208,11 +208,22 @@ function Checkbox() {
   );
 }
 
-/* ─── Folder icon (vembu uses fa-folder after checkbox) ─────────────────────── */
+/* ─── Folder-OPEN icon (fa-folder-open exact match — vembu uses this) ────────── */
 function FolderIcon({ color = '#adb5bd' }) {
   return (
-    <svg viewBox="0 0 24 24" width={14} height={14} fill={color} style={{ flexShrink: 0 }}>
-      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+    <svg viewBox="0 0 576 512" width={16} height={14} fill={color} style={{ flexShrink: 0 }}>
+      {/* Font Awesome fa-folder-open path */}
+      <path d="M572.694 292.093L500.27 416.248A63.997 63.997 0 0 1 444.989 448H45.025c-18.523 0-30.064-20.093-20.731-36.093l72.424-124.155A64 64 0 0 1 151.998 256H528c18.523 0 30.064 20.093 20.694 36.093zM152 224h328v-48c0-26.51-21.49-48-48-48H272l-64-64H48C21.49 64 0 85.49 0 112v278.046l69.077-118.418C86.214 242.25 117.989 224 152 224z"/>
+    </svg>
+  );
+}
+
+/* ─── Notes/copy icon (fa-file-text-o style — second icon in vembu rows) ─────── */
+function NoteIcon({ color = '#adb5bd' }) {
+  return (
+    <svg viewBox="0 0 384 512" width={12} height={14} fill={color} style={{ flexShrink: 0 }}>
+      {/* Font Awesome fa-file-text-o (file with lines) */}
+      <path d="M224 136V0H24C10.7 0 0 10.7 0 24v464c0 13.3 10.7 24 24 24h336c13.3 0 24-10.7 24-24V160H248c-13.2 0-24-10.8-24-24zm64 236c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12v8zm0-64c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12v8zm0-72v8c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12zm96-114.1L286.1 32c-4.5-4.5-10.6-7-17-7H256v128h128v-13.1c0-6.3-2.5-12.4-7-16.9z"/>
     </svg>
   );
 }
@@ -248,11 +259,12 @@ function GoalRow({ goal, goalActions, onChartClick }) {
       {/* Left color stripe */}
       <td style={{ width: 4, background: bgcolor, padding: 0 }} />
 
-      {/* Checkbox + folder */}
-      <td style={{ padding: '0 4px', width: 40 }}>
+      {/* Checkbox + folder-open + note icons (matches vembu: checkbox → note → folder-open) */}
+      <td style={{ padding: '0 4px', width: 52 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
           <Checkbox />
-          <FolderIcon color="rgba(255,255,255,0.7)" />
+          <NoteIcon color="rgba(255,255,255,0.75)" />
+          <FolderIcon color="rgba(255,255,255,0.85)" />
         </div>
       </td>
 
@@ -327,11 +339,12 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
       {/* Left color stripe — thin colored border matching plan color */}
       <td style={{ width: 4, background: planColor, padding: 0 }} />
 
-      {/* Checkbox + folder */}
-      <td style={{ padding: '0 4px', width: 40 }}>
+      {/* Checkbox + note + folder-open icons (matches vembu action row) */}
+      <td style={{ padding: '0 4px', width: 52 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
           <Checkbox />
-          <FolderIcon color="#adb5bd" />
+          <NoteIcon color={planColor} />
+          <FolderIcon color={planColor} />
         </div>
       </td>
 
