@@ -9,7 +9,8 @@ import {
 import { Slider } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import * as api from '../../api/client';
-import DOMPurify from 'dompurify';
+// simple HTML tag stripper — avoids dompurify dep
+const stripHtml = (html) => (html || '').replace(/<[^>]*>/g, '').replace(/^-$/, '').trim();
 import useAuthStore from '../../store/authStore';
 
 /* ─── Design tokens ────────────────────────────────────────────────────────── */
@@ -522,7 +523,7 @@ function NotesModal({ onClose, growthPlanId, goalTagId, actionTagId, planColor }
                   <button onClick={() => deleteNote(n.notesId)} style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer', fontSize: 12, padding: 0 }}>Delete</button>
                 )}
               </div>
-              <div style={{ fontSize: 13, color: C.text }} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(n.notes || '') }} />
+              <div style={{ fontSize: 13, color: C.text }} children={stripHtml(n.notes)} />
             </div>
           ))}
         </div>
