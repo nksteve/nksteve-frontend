@@ -314,9 +314,11 @@ export default function WorkPlan() {
 
   const planQuery = useQuery({
     queryKey: ['planDetail', planId, entityId, refreshKey],
-    queryFn: () => api.getGrowthPlanDetails({ action: 'GetPlanDetail', growthPlanId: planId, entityId }),
+    queryFn: () => api.getGrowthPlanDetails({ action: 'GetPlanDetail', growthPlanId: planId, entityId, companyId }),
     select: (res) => res.data,
     enabled: !!planId && !!entityId,
+    staleTime: 0,          // data immediately stale — always refetch on mount
+    refetchOnMount: true,  // always fetch fresh on mount (not 'always' to avoid double-fetch)
   });
 
   const activityQuery = useQuery({
@@ -420,7 +422,10 @@ export default function WorkPlan() {
   const goals = rawData.goals || [];
   const actions = rawData.actions || [];
   const percent = Number(plan.growthPlanPercentAchieved || 0);
-  const themeColor = plan.colorCodeHex ? `#${plan.colorCodeHex}` : C.purple;
+  // colorCodeHex may already include '#' prefix or may be a raw hex string
+  const themeColor = plan.colorCodeHex
+    ? (plan.colorCodeHex.startsWith('#') ? plan.colorCodeHex : `#${plan.colorCodeHex}`)
+    : C.purple;
 
   if (planQuery.isLoading) return <div style={{ padding: 32 }}><Spinner /></div>;
   if (planQuery.isError) return (
