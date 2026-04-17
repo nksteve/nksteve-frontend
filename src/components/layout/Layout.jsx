@@ -169,7 +169,7 @@ export default function Layout({ children }) {
       <header style={{
         position: 'sticky', top: 0, zIndex: 1000,
         background: C.headerBg, borderBottom: `1px solid ${C.border}`,
-        height: 60, display: 'flex', alignItems: 'stretch',
+        height: 85, display: 'flex', alignItems: 'stretch',
         padding: '0 24px 0 16px',
         justifyContent: 'space-between',
         boxShadow: '0 1px 4px rgba(0,0,0,.08)',
