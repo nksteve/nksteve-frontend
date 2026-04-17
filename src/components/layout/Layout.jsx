@@ -120,8 +120,9 @@ function SecondaryNav({ currentPath }) {
       borderBottom: `1px solid ${C.border}`,
       display: 'flex',
       alignItems: 'stretch',
-      height: 46,
-      paddingLeft: 16,
+      height: 48,
+      paddingLeft: 24,
+      boxShadow: '0 1px 3px rgba(0,0,0,.06)',
     }}>
       {NAV_ITEMS.map(item => {
         const active = currentPath === item.path ||
@@ -132,18 +133,19 @@ function SecondaryNav({ currentPath }) {
             to={item.path}
             style={{
               textDecoration: 'none',
-              padding: '0 16px',
+              padding: '0 18px',
               height: '100%',
               display: 'flex',
               alignItems: 'center',
-              fontSize: 14,
+              fontSize: 15,
               fontWeight: active ? 600 : 400,
-              color: active ? C.teal : C.text,
+              color: active ? C.teal : '#4e5a65',
               borderBottom: active ? `3px solid ${C.teal}` : '3px solid transparent',
               whiteSpace: 'nowrap',
+              transition: 'color .15s',
             }}
             onMouseEnter={e => { if (!active) e.currentTarget.style.color = C.teal; }}
-            onMouseLeave={e => { if (!active) e.currentTarget.style.color = C.text; }}
+            onMouseLeave={e => { if (!active) e.currentTarget.style.color = '#4e5a65'; }}
           >
             {item.label}
           </Link>
@@ -188,22 +190,19 @@ export default function Layout({ children }) {
         justifyContent: 'space-between',
         boxShadow: '0 1px 4px rgba(0,0,0,.08)',
       }}>
-        {/* Left: Logo */}
+        {/* Left: Logo — same image as vembu (300px wide, auto height) */}
         <Link to="/dashboard" style={{
           textDecoration: 'none', display: 'flex', alignItems: 'center', flexShrink: 0,
         }}>
-          <span style={{ fontSize: 24, fontWeight: 900, letterSpacing: -0.5, lineHeight: 1 }}>
-            <span style={{ color: C.text }}>Team</span>
-            <span style={{ color: C.teal }}>On</span>
-            <span style={{ color: C.purple }}>UP</span>
-          </span>
+          <img
+            src="/logo.png"
+            alt="TeamOnUP"
+            style={{ width: 220, height: 'auto', objectFit: 'contain', maxHeight: 70 }}
+          />
         </Link>
 
-        {/* Center: Company and User name label (matches vembu) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, color: C.grey, fontSize: 14 }}>
-          <span>Company and User name</span>
-          <span style={{ color: C.text, fontWeight: 500 }}>{companyName}</span>
-        </div>
+        {/* Center: empty — matches vembu (no center content) */}
+        <div />
 
         {/* Right: Name + Avatar dropdown */}
         <UserDropdown

@@ -70,7 +70,7 @@ function PlanCard({ plan, onClick }) {
     >
       {/* Plan name + status */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-        <span style={{ fontSize: 15, fontWeight: 600, color: C.text, lineHeight: 1.3 }}>
+        <span style={{ fontSize: 18, fontWeight: 700, color: C.text, lineHeight: 1.3 }}>
           ≡ {plan.name || plan.planName}
         </span>
         <span style={{
