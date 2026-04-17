@@ -936,8 +936,8 @@ export default function WorkPlan() {
         <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: 4 }} />
-            <col style={{ width: 44 }} />
-            <col style={{ width: 261 }} />
+            <col style={{ width: 24 }} />
+            <col style={{ width: 277 }} />
             <col style={{ width: 20 }} />
             <col style={{ width: 48 }} />
             <col />
