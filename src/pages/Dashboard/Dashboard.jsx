@@ -263,12 +263,12 @@ function NewPlanModal({ onClose, onCreated, entityId, companyId }) {
   );
 }
 
-// ── TABS config ───────────────────────────────────────────────────────────────
+// ── TABS config — action must match vembu's SP action names exactly ───────────
 const TABS = [
-  { id: '1', label: 'Goal Plans',    key: 'my'        },
-  { id: '2', label: 'Assigned',      key: 'assigned'  },
-  { id: '4', label: 'Completed',     key: 'completed' },
-  { id: '5', label: 'Deleted Plans', key: 'deleted'   },
+  { id: '1', label: 'Goal Plans',    action: 'AllPlans'             },
+  { id: '2', label: 'Assigned',      action: 'InvitedGoalPlans'     },
+  { id: '4', label: 'Completed',     action: 'MyCompletedGoalPlans' },
+  { id: '5', label: 'Deleted Plans', action: 'DeleteGoalPlan'       },
 ];
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
@@ -293,9 +293,11 @@ export default function Dashboard() {
   });
 
   // ── Fetch plans ───────────────────────────────────────────────────────────
+  // Re-fetch per tab using the correct SP action (matches vembu exactly)
+  const activeAction = TABS.find(t => t.id === activeTab)?.action || 'AllPlans';
   const { data: plansData, isLoading } = useQuery({
-    queryKey: ['myPlans', entityId],
-    queryFn: () => api.getMyPlans({ entityId, companyId, action: 'AllPlans' }),
+    queryKey: ['myPlans', entityId, activeAction],
+    queryFn: () => api.getMyPlans({ entityId, companyId, action: activeAction }),
     enabled: !!entityId,
     select: r => r.data?.plans || r.data?.myPlans || [],
     staleTime: 60 * 1000,
@@ -320,19 +322,11 @@ export default function Dashboard() {
   };
 
   // ── Filter plans by tab ───────────────────────────────────────────────────
+  // SP filters by tab action server-side — just apply local search here
   const allPlans = plansData || [];
-
-  const filterByTab = (tab) => {
-    let list = allPlans;
-    if (tab === '1') list = allPlans.filter(p => !p.isDeleted && (p.statusId === 1 || p.statusId === 3 || !p.statusId));
-    else if (tab === '2') list = allPlans.filter(p => p.isAssigned || p.entityId !== entityId);
-    else if (tab === '4') list = allPlans.filter(p => p.statusId === 2 || p.statusId === 4 || p.status === 'Complete');
-    else if (tab === '5') list = allPlans.filter(p => p.isDeleted || p.statusId === 5);
-    if (search) list = list.filter(p => (p.name || p.planName || '').toLowerCase().includes(search.toLowerCase()));
-    return list;
-  };
-
-  const visiblePlans = filterByTab(activeTab);
+  const visiblePlans = search
+    ? allPlans.filter(p => (p.name || '').toLowerCase().includes(search.toLowerCase()))
+    : allPlans;
 
   // Strip trailing " - " artifacts that vembu sometimes appends to HTML content
   const cleanHtml = (s) => (s || '').replace(/\s*-\s*$/, '').trim();
