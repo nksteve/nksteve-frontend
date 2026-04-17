@@ -43,12 +43,11 @@ function GrowthProgress({ pct, color }) {
   );
 }
 
-// ── Plan card – matches vembu GrowthPlan card ─────────────────────────────────
+// ── Plan card – matches vembu exactly (clean row with bottom border) ──────────
 function PlanCard({ plan, onClick }) {
   const color   = planColor(plan.colorCodeHex);
   const dueDate = plan.milestoneDate || plan.dueDate || '';
   const pct     = plan.growthPlanPercentAchieved ?? plan.percentAchieved ?? 0;
-  const status  = plan.status || plan.statusLabel || 'Open';
   const owner   = [plan.firstName, plan.lastName].filter(Boolean).join(' ') || '';
 
   const formatted = dueDate
@@ -59,39 +58,34 @@ function PlanCard({ plan, onClick }) {
     <div
       onClick={() => onClick(plan)}
       style={{
-        background: C.white, borderRadius: 4,
-        boxShadow: '0 1px 3px rgba(0,0,0,.12)', marginBottom: 12,
-        padding: '12px 16px', cursor: 'pointer',
-        borderLeft: `4px solid ${color}`,
-        transition: 'box-shadow .2s',
+        background: C.white,
+        borderBottom: `1px solid ${C.border}`,
+        padding: '14px 16px',
+        cursor: 'pointer',
+        transition: 'background .15s',
       }}
-      onMouseEnter={e => e.currentTarget.style.boxShadow = '0 3px 10px rgba(0,0,0,.15)'}
-      onMouseLeave={e => e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,.12)'}
+      onMouseEnter={e => e.currentTarget.style.background = '#f8f9fa'}
+      onMouseLeave={e => e.currentTarget.style.background = C.white}
     >
-      {/* Plan name + status */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-        <span style={{ fontSize: 18, fontWeight: 700, color: C.text, lineHeight: 1.3 }}>
-          ≡ {plan.name || plan.planName}
-        </span>
+      {/* Plan name row */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
         <span style={{
-          fontSize: 11, fontWeight: 700, padding: '2px 10px',
-          borderRadius: 12, textTransform: 'uppercase', letterSpacing: .5,
-          background: status === 'Complete' || status === 'Completed' ? '#d4edda' : '#fff3cd',
-          color:      status === 'Complete' || status === 'Completed' ? '#155724' : '#856404',
-          marginLeft: 8, whiteSpace: 'nowrap',
+          fontSize: 18, fontWeight: 700, color: color, lineHeight: 1.3,
+          display: 'flex', alignItems: 'center', gap: 8,
         }}>
-          {status}
+          <span style={{ fontSize: 20, lineHeight: 1 }}>≡</span>
+          {plan.name || plan.planName}
         </span>
       </div>
 
       {/* Due date + Owner + Progress */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
         {formatted && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 12, color: C.grey }}>Due Date</span>
+            <span style={{ fontSize: 13, color: C.grey }}>Due Date</span>
             <span style={{
               fontSize: 12, fontWeight: 600, color: C.white,
-              background: color, padding: '1px 8px', borderRadius: 3,
+              background: color, padding: '2px 8px', borderRadius: 3,
             }}>
               {formatted}
             </span>
@@ -99,8 +93,8 @@ function PlanCard({ plan, onClick }) {
         )}
         {owner && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: 12, color: C.grey }}>Owner:</span>
-            <span style={{ fontSize: 12, color: C.text }}>{owner}</span>
+            <span style={{ fontSize: 13, color: C.grey }}>Owner:</span>
+            <span style={{ fontSize: 13, color: C.text }}> {owner}</span>
           </div>
         )}
         <GrowthProgress pct={pct} color={color} />
@@ -109,7 +103,7 @@ function PlanCard({ plan, onClick }) {
   );
 }
 
-// ── Vision / Mission / Values card ────────────────────────────────────────────
+// ── Vision / Mission / Values card – matches vembu (teal border outline) ─────
 function VMVCard({ title, content, initial, onSave }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(content || '');
@@ -120,16 +114,17 @@ function VMVCard({ title, content, initial, onSave }) {
 
   return (
     <div style={{
-      flex: 1, background: C.white, border: `1px solid ${C.border}`,
+      flex: 1, background: C.white,
+      border: `1px solid ${C.teal}`,
       borderRadius: 4, minHeight: 190, display: 'flex', flexDirection: 'column',
     }}>
       {/* Header */}
       <div style={{
-        borderBottom: `1px solid ${C.border}`, padding: '10px 16px',
+        padding: '10px 16px',
         display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative',
       }}>
         <h5 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.teal, textTransform: 'uppercase', letterSpacing: 1 }}>
-          <span style={{ color: C.purple }}>{initial}</span>{title.slice(1)}
+          <span style={{ color: C.purple, fontSize: 17 }}>{initial}</span>{title.slice(1).toUpperCase()}
         </h5>
         <button
           onClick={() => setEditing(!editing)}
@@ -143,7 +138,7 @@ function VMVCard({ title, content, initial, onSave }) {
         </button>
       </div>
       {/* Body */}
-      <div style={{ flex: 1, padding: '12px 16px' }}>
+      <div style={{ flex: 1, padding: '8px 16px' }}>
         {editing ? (
           <>
             <textarea
@@ -263,13 +258,14 @@ function NewPlanModal({ onClose, onCreated, entityId, companyId }) {
   );
 }
 
-// ── TABS config — action must match vembu's SP action names exactly ───────────
+// ── TABS config — matches vembu exactly (Invited & Nested are present but hidden)
+// Vembu hides value="2" (Nested Plans) and value="3" (Invited) using d-none class
 const TABS = [
-  { id: '3', label: 'Invited',       action: 'InvitedGoalPlans'     },
-  { id: '2', label: 'Nested Plans',  action: 'MyAssignedGoals'      },
-  { id: '1', label: 'Goal Plans',    action: 'AllPlans'             },
-  { id: '4', label: 'Completed',     action: 'MyCompletedGoalPlans' },
-  { id: '5', label: 'Deleted Plans', action: 'DeleteGoalPlan'       },
+  { id: '3', label: 'Invited',       action: 'InvitedGoalPlans',     hidden: true  },
+  { id: '2', label: 'Nested Plans',  action: 'MyAssignedGoals',      hidden: true  },
+  { id: '1', label: 'Goal Plans',    action: 'AllPlans',             hidden: false },
+  { id: '4', label: 'Completed',     action: 'MyCompletedGoalPlans', hidden: false },
+  { id: '5', label: 'Deleted Plans', action: 'DeleteGoalPlan',       hidden: false },
 ];
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
@@ -305,8 +301,6 @@ export default function Dashboard() {
   });
 
   // ── Update VMV mutation ───────────────────────────────────────────────────
-  // VMV fields (vission/mission/value) live in entity_interests table,
-  // updated via updateEntityInterestsTag SP with action='ADD'
   const vmvMutation = useMutation({
     mutationFn: (data) => api.updateEntityInterests(data),
     onSuccess: () => { qc.invalidateQueries(['entitySetup', entityId]); toast.success('Saved!'); },
@@ -323,7 +317,6 @@ export default function Dashboard() {
   };
 
   // ── Filter plans by tab ───────────────────────────────────────────────────
-  // SP filters by tab action server-side — just apply local search here
   const allPlans = plansData || [];
   const visiblePlans = search
     ? allPlans.filter(p => (p.name || '').toLowerCase().includes(search.toLowerCase()))
@@ -334,11 +327,12 @@ export default function Dashboard() {
   const vision  = cleanHtml(setupData?.vission  || setupData?.companyVision  || '');
   const mission = cleanHtml(setupData?.mission  || setupData?.companyMission || '');
   const values  = cleanHtml(setupData?.value    || setupData?.companyValues  || '');
-  const company = setupData?.companyName  || user?.email || '';
-  const fullName= setupData ? `${setupData.firstName || ''} ${setupData.lastName || ''}`.trim() : '';
+
+  // Visible tabs only (hidden ones exist in data but not shown — matches vembu)
+  const visibleTabs = TABS.filter(t => !t.hidden);
 
   return (
-    <div style={{ background: C.bg, minHeight: '100vh', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif" }}>
+    <div style={{ background: C.bg, minHeight: '100vh' }}>
       {/* ── Vision / Mission / Values ─────────────────────────────────────── */}
       <div style={{ padding: '16px 24px 0' }}>
         <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
@@ -359,70 +353,83 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* ── Action buttons ─────────────────────────────────────────────── */}
-        <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-          <button
-            onClick={() => setShowModal(true)}
-            style={{
-              background: C.purple, color: '#fff', border: 'none', borderRadius: 4,
-              padding: '8px 20px', cursor: 'pointer', fontSize: 14, fontWeight: 600,
-            }}
-          >
-            + Goal Plan
-          </button>
-          <button
-            style={{
-              background: C.teal, color: '#fff', border: 'none', borderRadius: 4,
-              padding: '8px 20px', cursor: 'pointer', fontSize: 14, fontWeight: 600,
-            }}
-          >
-            + Wealth
-          </button>
-          <button
-            style={{
-              background: C.tealDark, color: '#fff', border: 'none', borderRadius: 4,
-              padding: '8px 20px', cursor: 'pointer', fontSize: 14, fontWeight: 600,
-            }}
-          >
-            + Trending
-          </button>
-        </div>
-
-        {/* ── Tabs ───────────────────────────────────────────────────────── */}
-        <div style={{ borderBottom: `2px solid ${C.border}`, display: 'flex', gap: 0 }}>
-          {TABS.map(t => (
+        {/* ── Gray box area with buttons + tabs — matches vembu .gray-box ─── */}
+        <div style={{
+          background: C.bg, borderRadius: 4,
+          padding: '16px 8px 0',
+          marginBottom: 0,
+        }}>
+          {/* Action buttons */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
             <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
+              onClick={() => setShowModal(true)}
               style={{
-                border: 'none', background: 'none', cursor: 'pointer',
-                padding: '10px 20px', fontSize: 14, fontWeight: activeTab === t.id ? 700 : 400,
-                color:  activeTab === t.id ? C.teal : C.grey,
-                borderBottom: activeTab === t.id ? `3px solid ${C.teal}` : '3px solid transparent',
-                marginBottom: -2, transition: 'all .2s',
+                background: C.purple, color: '#fff', border: 'none', borderRadius: 4,
+                padding: '8px 20px', cursor: 'pointer', fontSize: 14, fontWeight: 600,
               }}
             >
-              {t.label}
+              + Goal Plan
             </button>
-          ))}
-
-          {/* Search */}
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
-            <input
-              placeholder="Search plans…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+            <button
               style={{
-                border: `1px solid ${C.border}`, borderRadius: 4, padding: '5px 12px',
-                fontSize: 13, outline: 'none', width: 200,
+                background: C.purple, color: '#fff', border: 'none', borderRadius: 4,
+                padding: '8px 20px', cursor: 'pointer', fontSize: 14, fontWeight: 600,
               }}
-            />
+            >
+              + Wealth
+            </button>
+            <button
+              onClick={() => navigate('/analytics')}
+              style={{
+                background: C.purple, color: '#fff', border: 'none', borderRadius: 4,
+                padding: '8px 20px', cursor: 'pointer', fontSize: 14, fontWeight: 600,
+              }}
+            >
+              + Trending
+            </button>
+          </div>
+
+          {/* ── Tabs — matches vembu: Goal Plans | Completed | Deleted Plans ── */}
+          <div style={{ display: 'flex', gap: 0, borderBottom: `1px solid ${C.border}`, background: C.white, paddingLeft: 0 }}>
+            {visibleTabs.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                style={{
+                  border: 'none',
+                  borderTop: activeTab === t.id ? 'none' : 'none',
+                  borderBottom: activeTab === t.id ? `2px solid ${C.teal}` : '2px solid transparent',
+                  background: 'none', cursor: 'pointer',
+                  padding: '10px 16px', fontSize: 14,
+                  fontWeight: activeTab === t.id ? 700 : 400,
+                  color:  activeTab === t.id ? C.text : C.grey,
+                  marginBottom: -1,
+                  transition: 'all .2s',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+
+            {/* Search — right aligned */}
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', paddingRight: 8 }}>
+              <input
+                placeholder="Search plans…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{
+                  border: `1px solid ${C.border}`, borderRadius: 4, padding: '5px 12px',
+                  fontSize: 13, outline: 'none', width: 200,
+                }}
+              />
+            </div>
           </div>
         </div>
       </div>
 
       {/* ── Plan list ────────────────────────────────────────────────────────── */}
-      <div style={{ padding: '16px 24px' }}>
+      <div style={{ padding: '0 24px 24px', background: C.white, margin: '0 0 24px' }}>
         {isLoading ? (
           <div style={{ textAlign: 'center', padding: 60, color: C.grey, fontSize: 15 }}>
             Loading plans…
@@ -430,7 +437,6 @@ export default function Dashboard() {
         ) : visiblePlans.length === 0 ? (
           <div style={{
             textAlign: 'center', padding: 60, color: C.grey, fontSize: 15,
-            background: C.white, borderRadius: 4, border: `1px dashed ${C.border}`,
           }}>
             {activeTab === '1' ? 'No goal plans yet. Click "+ Goal Plan" to create one.' : 'No plans in this category.'}
           </div>
