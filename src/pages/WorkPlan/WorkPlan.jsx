@@ -276,7 +276,7 @@ function GoalRow({ goal, goalActions, onChartClick }) {
           border: '1px solid rgba(255,255,255,0.5)',
           borderRadius: 3,
           padding: '2px 4px 2px 6px',
-          width: 265,
+          width: '100%',
           boxSizing: 'border-box',
         }}>
           <span style={{
@@ -360,7 +360,8 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
           border: '1px solid #c8ced3',
           borderRadius: 3,
           padding: '2px 4px 2px 6px',
-          width: 265,
+          width: '100%',
+          boxSizing: 'border-box',
         }}>
           <span style={{
             fontSize: 12.5, color: C.text,
