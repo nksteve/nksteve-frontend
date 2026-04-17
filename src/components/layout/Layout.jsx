@@ -139,18 +139,24 @@ function CompanyUserSelect({ userList, onSwitch }) {
   }, []);
 
   return (
-    <div ref={ref} style={{ position: 'relative', width: 240 }}>
+    <div ref={ref} style={{ position: 'relative', width: 260 }}>
+      {/* Vembu: rounded bordered input box (react-select style), borderRadius 10px, borderColor #f0f0f0 */}
       <div
         onClick={() => setOpen(o => !o)}
         style={{
-          border: 'none', borderRadius: 4,
-          padding: '7px 12px', background: 'transparent',
+          border: '1px solid #f0f0f0',
+          borderRadius: 10,
+          padding: '7px 14px',
+          background: C.white,
           fontSize: 14, color: C.grey, cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          minWidth: 220,
+          minWidth: 240,
+          boxShadow: open ? '0 0 0 0.2rem rgba(0,123,255,.25)' : 'none',
+          transition: 'box-shadow .15s',
         }}
       >
-        <span>Company and User name</span>
+        <span style={{ color: '#aaa' }}>Company and User name</span>
+        <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="#ccc" strokeWidth={2}><polyline points="6 9 12 15 18 9"/></svg>
       </div>
       {open && (
         <div style={{
