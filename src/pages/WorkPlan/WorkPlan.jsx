@@ -4,16 +4,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import {
   RefreshCw, Plus, Loader2, AlertCircle, X,
-  BarChart2, Target, Users, Video, FileText, Zap, Activity, Filter,
+  BarChart2, Users, Video, FileText, Zap, Activity,
+  ArrowUp, MessageCircle,
 } from 'lucide-react';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import * as api from '../../api/client';
 import useAuthStore from '../../store/authStore';
 
+/* ─── Design tokens ────────────────────────────────────────────────────────── */
 const C = {
   teal:    '#0197cc',
-  purple:  '#a25ddc',
+  purple:  '#6B3FA0',          // vembu goal row purple
   orange:  '#ffa500',
   green:   '#00e15a',
   bg:      '#f4f5fa',
@@ -23,45 +25,74 @@ const C = {
   text2:   '#73818f',
 };
 
-/* ─── Speedometer (SVG) ─────────────────────────────────────────────────────── */
+/* ─── Speedometer — matches vembu: gauge centered, progress bar wide right ── */
 function Speedometer({ percent = 0 }) {
-  const angle = -135 + (percent / 100) * 270;
-  const rad = (angle * Math.PI) / 180;
-  const cx = 60, cy = 60, r = 42;
-  const nx = cx + r * Math.cos(rad);
-  const ny = cy + r * Math.sin(rad);
-  const color = percent >= 80 ? C.green : percent >= 50 ? C.teal : C.orange;
+  const p = Math.min(100, Math.max(0, Number(percent) || 0));
+  // SVG coords: Y-axis is DOWN. Angles measured CW from east (standard SVG).
+  // Gauge arc: from 225° to 315° (bottom-left to bottom-right) sweeping CW = 270° total
+  // In SVG: 225° CW from east = bottom-left, 315° CW from east = bottom-right
+  const cx = 85, cy = 80, r = 60;
 
-  function arc(startDeg, endDeg, radius, stroke) {
-    const sr = (startDeg * Math.PI) / 180;
-    const er = (endDeg * Math.PI) / 180;
-    const x1 = cx + radius * Math.cos(sr), y1 = cy + radius * Math.sin(sr);
-    const x2 = cx + radius * Math.cos(er), y2 = cy + radius * Math.sin(er);
+  function ptOnCircle(deg) {
+    const rad = (deg * Math.PI) / 180;
+    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+  }
+
+  function arcPath(startDeg, endDeg, stroke, strokeW = 8) {
+    const s = ptOnCircle(startDeg);
+    const e = ptOnCircle(endDeg);
+    const sweep = ((endDeg - startDeg) + 360) % 360;
+    const large = sweep > 180 ? 1 : 0;
     return (
-      <path d={`M${x1} ${y1} A${radius} ${radius} 0 ${endDeg - startDeg > 180 ? 1 : 0} 1 ${x2} ${y2}`}
-        fill="none" stroke={stroke} strokeWidth={7} strokeLinecap="round" />
+      <path
+        d={`M${s.x.toFixed(2)} ${s.y.toFixed(2)} A${r} ${r} 0 ${large} 1 ${e.x.toFixed(2)} ${e.y.toFixed(2)}`}
+        fill="none" stroke={stroke} strokeWidth={strokeW} strokeLinecap="round"
+      />
     );
   }
 
+  // Gauge arc: 225° to 315° CW (through 270° at bottom = 0, then up to top = 4, then down to bottom-right = 8)
+  // Segments matching vembu colors: red (225-255), yellow (255-285), green (285-315)
+  // Needle: maps 0% to 225°, 100% to 315° CW
+  const needleDeg = 225 + (p / 100) * 270;
+  const npt = ptOnCircle(needleDeg);
+  // shorten needle slightly
+  const needleLen = r * 0.78;
+  const needleRad = (needleDeg * Math.PI) / 180;
+  const nx = cx + needleLen * Math.cos(needleRad);
+  const ny = cy + needleLen * Math.sin(needleRad);
+
+  const barColor = p < 50 ? C.orange : p < 80 ? '#e6a817' : '#0B6623';
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-      <svg width={120} height={84} viewBox="0 0 120 84">
-        {arc(-135, 45, 42, '#e4e7ea')}
-        {arc(-135, -45, 42, C.orange)}
-        {arc(-45,  15,  42, C.teal)}
-        {arc(15,   45,  42, C.green)}
-        <line x1={cx} y1={cy} x2={nx} y2={ny} stroke="#333" strokeWidth={2.5} strokeLinecap="round" />
-        <circle cx={cx} cy={cy} r={3.5} fill="#333" />
-        <text x={6}  y={80} fontSize={8} fill={C.text2}>0</text>
-        <text x={52} y={14} fontSize={8} fill={C.text2}>4</text>
-        <text x={108} y={80} fontSize={8} fill={C.text2}>8</text>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 0, flex: 1 }}>
+      {/* Gauge SVG — 150x110 viewBox to give room for labels below */}
+      <svg width={175} height={120} viewBox="0 0 170 115" style={{ flexShrink: 0 }}>
+        {/* grey full track */}
+        {arcPath(225, 315, '#e0e0e0')}
+        {/* colored segments: vembu red/yellow/green */}
+        {arcPath(225, 255, '#ef4444')}
+        {arcPath(255, 285, '#e6a817')}
+        {arcPath(285, 315, '#0B6623')}
+        {/* needle */}
+        <line x1={cx} y1={cy} x2={nx.toFixed(2)} y2={ny.toFixed(2)} stroke="#444" strokeWidth={2.5} strokeLinecap="round" />
+        <circle cx={cx} cy={cy} r={4.5} fill="#444" />
+        {/* tick labels */}
+        <text x={4}   y={108} fontSize={10} fill={C.text2} fontFamily="sans-serif">0</text>
+        <text x={78}  y={18}  fontSize={10} fill={C.text2} fontFamily="sans-serif">4</text>
+        <text x={152} y={108} fontSize={10} fill={C.text2} fontFamily="sans-serif">8</text>
+        <text x={66}  y={108} fontSize={10} fill={C.text2} fontFamily="sans-serif">{p.toFixed(0)}%</text>
       </svg>
-      <div>
-        <div style={{ fontSize: 12, color: C.text2, marginBottom: 5 }}>Progress</div>
-        <div style={{ position: 'relative', background: '#e4e7ea', borderRadius: 6, height: 24, width: 240, overflow: 'hidden' }}>
-          <div style={{ width: `${Math.min(100, percent)}%`, height: '100%', background: color, borderRadius: 6, transition: 'width .4s' }} />
+      {/* Progress label + bar — fills remaining width */}
+      <div style={{ flex: 1, paddingLeft: 14 }}>
+        <div style={{ fontSize: 12, color: C.text2, marginBottom: 5, fontWeight: 500 }}>Progress</div>
+        <div style={{ background: '#e8e8e8', borderRadius: 4, height: 22, position: 'relative', overflow: 'hidden' }}>
+          <div style={{
+            width: `${p}%`, height: '100%', borderRadius: 4,
+            background: barColor, transition: 'width .4s',
+          }} />
         </div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginTop: 5 }}>
+        <div style={{ fontSize: 18, fontWeight: 700, color: C.text, marginTop: 4 }}>
           {Number(percent || 0).toFixed(2)}%
         </div>
       </div>
@@ -69,203 +100,419 @@ function Speedometer({ percent = 0 }) {
   );
 }
 
-/* ─── Toolbar icons — matches vembu exactly ─────────────────────────────────── */
+/* ─── Header toolbar icons (vembu: clipboard, link, bar-chart, palette, print, stack, fire, person) ── */
 const TOOLBAR_ICONS = [
-  { title: 'Chart',    svg: <BarChart2 size={15} /> },
-  { title: 'Edit',     svg: <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> },
-  { title: 'Trend',    svg: <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg> },
-  { title: 'Palette',  svg: <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}><circle cx={12} cy={12} r={10}/><circle cx={8}  cy={14} r={1} fill="currentColor"/><circle cx={12} cy={8}  r={1} fill="currentColor"/><circle cx={16} cy={14} r={1} fill="currentColor"/></svg> },
-  { title: 'Print',    svg: <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x={6} y={14} width={12} height={8}/></svg> },
-  { title: 'Stack',    svg: <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}><rect x={2} y={3}  width={20} height={4} rx={1}/><rect x={2} y={10} width={20} height={4} rx={1}/><rect x={2} y={17} width={20} height={4} rx={1}/></svg> },
-  { title: 'Fire',     svg: <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg> },
-  { title: 'Users',    svg: <Users size={15} /> },
+  { title: 'Notes',   svg: <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}><rect x={5} y={2} width={14} height={20} rx={2}/><line x1={9} y1={7} x2={15} y2={7}/><line x1={9} y1={11} x2={15} y2={11}/><line x1={9} y1={15} x2={12} y2={15}/></svg> },
+  { title: 'Link',    svg: <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> },
+  { title: 'Chart',   svg: <BarChart2 size={15} /> },
+  { title: 'Palette', svg: <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}><circle cx={12} cy={12} r={10}/><circle cx={8} cy={14} r={1} fill="currentColor"/><circle cx={12} cy={8} r={1} fill="currentColor"/><circle cx={16} cy={14} r={1} fill="currentColor"/></svg> },
+  { title: 'Print',   svg: <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x={6} y={14} width={12} height={8}/></svg> },
+  { title: 'Stack',   svg: <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}><rect x={2} y={3}  width={20} height={4} rx={1}/><rect x={2} y={10} width={20} height={4} rx={1}/><rect x={2} y={17} width={20} height={4} rx={1}/></svg> },
+  { title: 'Fire',    svg: <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg> },
+  { title: 'Users',   svg: <Users size={15} /> },
 ];
 
-function ActionToolbar({ onRefresh }) {
+/* ─── Goal progress bar — matches vembu: colored fill + 3 tick marks ────────── */
+function GoalProgressBar({ pct, goalMin, goalStretch, themeColor }) {
+  const p   = Math.min(100, Math.max(0, Number(pct) || 0));
+  // vembu color logic for goal
+  const fill = p < 50 ? '#ffa500' : p < 80 ? '#008ECC' : '#0B6623';
+  // tick positions
+  const minPct     = goalMin     ? Math.min(100, Number(goalMin))     : null;
+  const stretchPct = goalStretch ? Math.min(99,  Number(goalStretch)) : null;
+  const greenPct   = (goalStretch && goalStretch > 100) ? (100 / goalStretch * 100) : null;
+
   return (
-    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-      {TOOLBAR_ICONS.map(({ title, svg }) => (
-        <button key={title} title={title}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '5px 6px', borderRadius: 4, color: C.teal, display: 'flex' }}
-          onMouseEnter={e => e.currentTarget.style.background = '#f0f4f8'}
-          onMouseLeave={e => e.currentTarget.style.background = 'none'}
-        >{svg}</button>
-      ))}
-      <button onClick={onRefresh}
-        style={{ marginLeft: 6, background: C.teal, border: 'none', borderRadius: 6, cursor: 'pointer', padding: '6px 9px', color: '#fff', display: 'flex', alignItems: 'center' }}
-        title="Refresh"
-      ><RefreshCw size={15} /></button>
+    <div style={{ flex: 1, position: 'relative', height: 14, background: '#e0e0e0', borderRadius: 3, margin: '0 8px', overflow: 'visible' }}>
+      {/* filled portion */}
+      <div style={{ width: `${p}%`, height: '100%', background: fill, borderRadius: 3, transition: 'width .4s' }} />
+      {/* red tick (min) */}
+      {minPct !== null && (
+        <span style={{ position: 'absolute', left: `${minPct}%`, top: 0, width: 4, height: '100%', background: 'red', cursor: 'pointer' }} />
+      )}
+      {/* purple tick (stretch) */}
+      {stretchPct !== null && (
+        <span style={{ position: 'absolute', left: `${stretchPct}%`, top: 0, width: 4, height: '100%', background: 'purple', cursor: 'pointer', zIndex: 1 }} />
+      )}
+      {/* green tick (100% mark when stretch>100) */}
+      {greenPct !== null && (
+        <span style={{ position: 'absolute', left: `${greenPct}%`, top: 0, width: 4, height: '100%', background: 'green', cursor: 'pointer', zIndex: 1 }} />
+      )}
     </div>
   );
 }
 
-/* ─── Progress slider (read-only, matches vembu visual) ─────────────────────── */
-function ProgressSlider({ pct, isGoal, themeColor }) {
+/* ─── Action progress slider — matches vembu: colored track + large circle thumb ── */
+function ActionSlider({ pct }) {
   const p = Math.min(100, Math.max(0, Number(pct) || 0));
-  // vembu color logic: orange <50%, teal-blue 50-80%, green >=80%
-  const sliderColor = p < 50 ? C.orange : p < 80 ? '#008ECC' : '#0B6623';
-  const trackBg  = isGoal ? 'rgba(255,255,255,0.30)' : '#e4e7ea';
-  const fillBg   = isGoal ? 'rgba(255,255,255,0.80)' : sliderColor;
-  const thumbColor = isGoal ? '#fff' : '#fff';
-  const thumbBorder = isGoal ? (themeColor || C.purple) : sliderColor;
+  const color = p >= 80 ? '#0B6623' : p >= 50 ? '#e6a817' : '#e6a817'; // green>=80, gold otherwise
+  const trackFill = p === 0 ? 'transparent' : color;
 
   return (
-    <div style={{ flex: 1, position: 'relative', height: 8, background: trackBg, borderRadius: 4, margin: '0 6px' }}>
-      <div style={{ width: `${p}%`, height: '100%', background: fillBg, borderRadius: 4, transition: 'width .3s' }} />
+    <div style={{ flex: 1, position: 'relative', height: 6, background: '#e8e8e8', borderRadius: 3, margin: '0 6px' }}>
+      {p > 0 && (
+        <div style={{ width: `${p}%`, height: '100%', background: color, borderRadius: 3 }} />
+      )}
       <div style={{
-        position: 'absolute', left: `calc(${p}% - 10px)`, top: '50%', transform: 'translateY(-50%)',
-        width: 20, height: 20, borderRadius: '50%',
-        background: thumbColor,
-        border: `2px solid ${thumbBorder}`,
+        position: 'absolute',
+        left: `calc(${p}% - 11px)`,
+        top: '50%',
+        transform: 'translateY(-50%)',
+        width: 22, height: 22, borderRadius: '50%',
+        background: '#fff',
+        border: `2.5px solid ${p >= 80 ? '#0B6623' : '#e6a817'}`,
         boxShadow: '0 1px 3px rgba(0,0,0,.15)',
       }} />
     </div>
   );
 }
 
-/* ─── Goal header row — colored band like vembu ─────────────────────────────── */
-function GoalHeaderRow({ goal, goalActions, themeColor, onGoalClick, isSelected }) {
+/* ─── Checkbox icon (vembu uses a square checkbox style) ───────────────────── */
+function Checkbox() {
+  return (
+    <div style={{ width: 16, height: 16, border: '1.5px solid #adb5bd', borderRadius: 2, flexShrink: 0, background: '#fff' }} />
+  );
+}
+
+/* ─── Folder icon (vembu uses fa-folder after checkbox) ─────────────────────── */
+function FolderIcon({ color = '#adb5bd' }) {
+  return (
+    <svg viewBox="0 0 24 24" width={14} height={14} fill={color} style={{ flexShrink: 0 }}>
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+/* ─── Decision icon (vembu uses a wrench/asterisk looking icon) ──────────────── */
+function DecisionIcon({ color }) {
+  return (
+    <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke={color || '#adb5bd'} strokeWidth={2} style={{ flexShrink: 0 }}>
+      <circle cx={12} cy={12} r={3}/>
+      <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+    </svg>
+  );
+}
+
+/* ─── Yellow square dot (vembu uses a yellow square, not circle) ─────────────── */
+function YellowDot() {
+  return <div style={{ width: 12, height: 12, background: '#ffc107', borderRadius: 2, flexShrink: 0 }} />;
+}
+
+/* ─── Goal header row — purple band matching vembu ─────────────────────────── */
+function GoalRow({ goal, goalActions, onChartClick }) {
   // Aggregate % from actions (average of actionGoalPercentAchieve)
   const actionPcts = goalActions.map(a => Number(a.actionGoalPercentAchieve || 0));
-  const aggPct = actionPcts.length > 0
+  const aggPct     = actionPcts.length > 0
     ? actionPcts.reduce((s, v) => s + v, 0) / actionPcts.length
     : Number(goal.goalPercentAchieved || 0);
   const pct = Math.min(100, aggPct);
-
-  const bg = themeColor || C.purple;
   const milestoneDate = goal.goalMilestoneDate || goal.milestoneDate;
+  const bgcolor = C.purple; // vembu always uses purple for goal rows
 
   return (
-    <div
-      onClick={() => onGoalClick && onGoalClick(goal)}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        padding: '0 10px', height: 38,
-        background: bg,
-        borderBottom: '1px solid rgba(255,255,255,0.15)',
-        cursor: 'pointer',
-        userSelect: 'none',
-      }}
-    >
-      {/* Checkbox */}
-      <div style={{ width: 15, height: 15, border: '1px solid rgba(255,255,255,0.7)', borderRadius: 3, flexShrink: 0, background: 'rgba(255,255,255,0.2)' }} />
+    <tr style={{ background: bgcolor }}>
+      {/* Left color stripe */}
+      <td style={{ width: 4, background: bgcolor, padding: 0 }} />
 
-      {/* Name */}
-      <div style={{ flex: '0 0 200px', fontSize: 13, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {goal.goalName || goal.name || '—'}
-      </div>
+      {/* Checkbox + folder */}
+      <td style={{ padding: '0 4px', width: 40 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+          <Checkbox />
+          <FolderIcon color="rgba(255,255,255,0.7)" />
+        </div>
+      </td>
 
-      {/* Icons */}
-      <div style={{ flex: '0 0 44px', display: 'flex', gap: 5, alignItems: 'center' }}>
-        <BarChart2 size={13} color="rgba(255,255,255,0.8)" />
-        <Target    size={13} color="rgba(255,255,255,0.8)" />
-      </div>
+      {/* Goal name — vembu: plain white text in the colored band */}
+      <td style={{ padding: '0 6px', width: 249 }}>
+        <div style={{
+          fontSize: 13, fontWeight: 600, color: '#fff',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          width: 249,
+        }}>
+          {goal.goalName || '—'}
+        </div>
+      </td>
 
       {/* Yellow dot */}
-      <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ffc107', flexShrink: 0 }} />
+      <td style={{ padding: '0 4px', width: 20 }}>
+        <YellowDot />
+      </td>
 
-      {/* Slider */}
-      <ProgressSlider pct={pct} isGoal={true} themeColor={bg} />
+      {/* Bar chart + decision icons */}
+      <td style={{ padding: '0 4px', width: 44 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <button
+            onClick={() => onChartClick && onChartClick(goal, goalActions)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'rgba(255,255,255,0.85)', display: 'flex' }}
+            title="View Chart"
+          >
+            <BarChart2 size={14} />
+          </button>
+          <DecisionIcon color="rgba(255,255,255,0.75)" />
+        </div>
+      </td>
+
+      {/* Goal progress bar (wide, colored, with ticks) */}
+      <td style={{ padding: '0 4px' }}>
+        <GoalProgressBar
+          pct={pct}
+          goalMin={goal.goalMin}
+          goalStretch={goal.goalStretch}
+        />
+      </td>
 
       {/* % */}
-      <div style={{ flex: '0 0 52px', textAlign: 'right', fontSize: 13, fontWeight: 700, color: '#fff' }}>
+      <td style={{ padding: '0 6px', width: 60, textAlign: 'right', fontSize: 13, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>
         {pct.toFixed(1)}%
-      </div>
+      </td>
 
       {/* Due date */}
-      <div style={{ flex: '0 0 92px', textAlign: 'right', fontSize: 12, color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
+      <td style={{ padding: '0 8px', width: 110, textAlign: 'right', fontSize: 12, fontWeight: 600, color: pct > 0 ? '#7DF9BC' : 'rgba(255,255,255,0.85)', whiteSpace: 'nowrap' }}>
         {milestoneDate
           ? new Date(milestoneDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
-          : <span style={{ opacity: 0.5 }}>📅</span>
-        }
-      </div>
-
-      {/* Delete icon */}
-      <div style={{ flex: '0 0 22px', display: 'flex', justifyContent: 'center' }}>
-        <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth={2}>
-          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-        </svg>
-      </div>
-    </div>
+          : ''}
+      </td>
+    </tr>
   );
 }
 
-/* ─── Action sub-row ─────────────────────────────────────────────────────────── */
-function ActionSubRow({ action, themeColor }) {
-  const pct = Math.min(100, Number(action.actionGoalPercentAchieve || 0));
-  const endDate = action.endDate || action.milestoneDate;
+/* ─── Action sub-row — white background, vembu style ────────────────────────── */
+function ActionRow({ action, themeColor }) {
+  const pct      = Math.min(100, Number(action.actionGoalPercentAchieve || 0));
+  const endDate  = action.endDate || action.milestoneDate;
   const planColor = themeColor || C.teal;
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 6,
-      padding: '0 10px', height: 36,
-      background: C.white,
-      borderBottom: `1px solid ${C.border}`,
-    }}>
-      {/* Checkbox */}
-      <div style={{ width: 15, height: 15, border: '1px solid #adb5bd', borderRadius: 3, flexShrink: 0 }} />
+    <tr style={{ background: '#fff', borderBottom: `1px solid ${C.border}` }}>
+      {/* Left color stripe — thin colored border matching plan color */}
+      <td style={{ width: 4, background: planColor, padding: 0 }} />
 
-      {/* Name — vembu style: white bg, colored border, colored text */}
-      <div style={{
-        flex: '0 0 190px',
-        fontSize: 12.5,
-        color: planColor,
-        border: `1px solid ${planColor}`,
-        background: '#fff',
-        borderRadius: 3,
-        padding: '2px 6px',
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-      }}>
-        {action.actionName || '—'}
-      </div>
+      {/* Checkbox + folder */}
+      <td style={{ padding: '0 4px', width: 40 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+          <Checkbox />
+          <FolderIcon color="#adb5bd" />
+        </div>
+      </td>
 
-      {/* Icons — bar-chart + asterisk/decision in plan color like vembu */}
-      <div style={{ flex: '0 0 40px', display: 'flex', gap: 4, alignItems: 'center' }}>
-        <BarChart2 size={12} color={planColor} />
-        <Target    size={12} color={planColor} />
-      </div>
+      {/* Action name — vembu: white input box, plain black text */}
+      <td style={{ padding: '0 6px', width: 249 }}>
+        <div style={{
+          fontSize: 12.5, color: C.text,
+          background: '#fff',
+          border: '1px solid #c8ced3',
+          borderRadius: 3,
+          padding: '2px 6px',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          width: 237,
+        }}>
+          {action.actionName || '—'}
+        </div>
+      </td>
 
       {/* Yellow dot */}
-      <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ffc107', flexShrink: 0 }} />
+      <td style={{ padding: '0 4px', width: 20 }}>
+        <YellowDot />
+      </td>
 
-      {/* Slider */}
-      <ProgressSlider pct={pct} isGoal={false} themeColor={planColor} />
+      {/* Bar chart + decision icons */}
+      <td style={{ padding: '0 4px', width: 44 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <BarChart2 size={13} color={C.text2} />
+          <DecisionIcon color={C.text2} />
+        </div>
+      </td>
+
+      {/* Action slider */}
+      <td style={{ padding: '0 4px' }}>
+        <ActionSlider pct={pct} />
+      </td>
 
       {/* % */}
-      <div style={{ flex: '0 0 52px', textAlign: 'right', fontSize: 12.5, fontWeight: 600, color: C.text }}>
+      <td style={{ padding: '0 6px', width: 60, textAlign: 'right', fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap' }}>
         {pct.toFixed(1)}%
-      </div>
+      </td>
 
-      {/* Due date */}
-      <div style={{ flex: '0 0 92px', textAlign: 'right' }}>
+      {/* Due date / calendar icon */}
+      <td style={{ padding: '0 8px', width: 110, textAlign: 'right' }}>
         {endDate
-          ? <span style={{ fontSize: 12, color: C.teal, fontWeight: 600 }}>
+          ? <span style={{ fontSize: 11.5, color: C.teal, fontWeight: 600 }}>
               {new Date(endDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
             </span>
-          : <span style={{ color: '#cbd5e0', fontSize: 13 }}>📅</span>
+          : <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke={C.text2} strokeWidth={2} style={{ display: 'inline-block' }}>
+              <rect x={3} y={4} width={18} height={18} rx={2}/><line x1={16} y1={2} x2={16} y2={6}/><line x1={8} y1={2} x2={8} y2={6}/><line x1={3} y1={10} x2={21} y2={10}/>
+            </svg>
         }
-      </div>
+      </td>
+    </tr>
+  );
+}
 
-      {/* Delete icon */}
-      <div style={{ flex: '0 0 22px', display: 'flex', justifyContent: 'center' }}>
-        <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke={C.text2} strokeWidth={2}>
-          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-        </svg>
+/* ─── Goal Chart Modal ────────────────────────────────────────────────────────── */
+const MODAL_TABS = [
+  { id: 'chart',    Icon: BarChart2,      label: 'Chart' },
+  { id: 'decision', Icon: DecisionIcon,   label: 'Decision' },
+  { id: 'headsup',  Icon: MessageCircle,  label: 'HeadsUp' },
+];
+
+function GoalChartModal({ goal, goalActions, onClose }) {
+  const [modalTab, setModalTab] = useState('chart');
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
+      <div style={{ background: '#fff', borderRadius: 8, width: 860, maxWidth: '95vw', maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 40px rgba(0,0,0,.25)' }}>
+        {/* Modal header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderBottom: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{goal.goalName}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {MODAL_TABS.map(({ id, Icon, label }) => (
+                <button key={id} onClick={() => setModalTab(id)}
+                  title={label}
+                  style={{
+                    background: modalTab === id ? '#e6f7fd' : 'none',
+                    border: 'none', cursor: 'pointer', padding: '4px 6px', borderRadius: 4,
+                    color: modalTab === id ? C.teal : C.text2, display: 'flex',
+                  }}
+                >
+                  {id === 'decision' ? <DecisionIcon color={modalTab === id ? C.teal : C.text2} /> : <Icon size={15} />}
+                </button>
+              ))}
+            </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text2, display: 'flex' }}>
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Modal body */}
+        <div style={{ padding: '16px 18px', overflowY: 'auto', flex: 1 }}>
+          {modalTab === 'chart' && (
+            <div>
+              <div style={{ marginBottom: 12 }}>
+                <h3 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: C.text }}>Goal Progress</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontSize: 12, color: C.text2 }}>Overall:</span>
+                  <div style={{ flex: 1, background: '#e8e8e8', borderRadius: 3, height: 10, position: 'relative', overflow: 'hidden' }}>
+                    {(() => {
+                      const actionPcts = goalActions.map(a => Number(a.actionGoalPercentAchieve || 0));
+                      const agg = actionPcts.length > 0 ? actionPcts.reduce((s,v)=>s+v,0)/actionPcts.length : 0;
+                      const fill = agg < 50 ? C.orange : agg < 80 ? '#008ECC' : '#0B6623';
+                      return <div style={{ width: `${Math.min(100,agg)}%`, height: '100%', background: fill, borderRadius: 3 }} />;
+                    })()}
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: C.text, minWidth: 44 }}>
+                    {(goalActions.length > 0
+                      ? goalActions.reduce((s,a)=>s+Number(a.actionGoalPercentAchieve||0),0)/goalActions.length
+                      : 0).toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+              {/* Actions list */}
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#f8f9fa' }}>
+                    <th style={{ textAlign: 'left', padding: '6px 10px', fontSize: 12, color: C.text2, fontWeight: 600 }}>Action</th>
+                    <th style={{ textAlign: 'center', padding: '6px 10px', fontSize: 12, color: C.text2, fontWeight: 600, width: 200 }}>Progress</th>
+                    <th style={{ textAlign: 'right', padding: '6px 10px', fontSize: 12, color: C.text2, fontWeight: 600, width: 60 }}>%</th>
+                    <th style={{ textAlign: 'right', padding: '6px 10px', fontSize: 12, color: C.text2, fontWeight: 600, width: 100 }}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {goalActions.length === 0 && (
+                    <tr><td colSpan={4} style={{ padding: 16, textAlign: 'center', color: C.text2, fontSize: 13 }}>No actions yet.</td></tr>
+                  )}
+                  {goalActions.map((a, i) => {
+                    const p = Math.min(100, Number(a.actionGoalPercentAchieve || 0));
+                    const fill = p >= 80 ? '#0B6623' : p >= 50 ? '#008ECC' : C.orange;
+                    return (
+                      <tr key={a.actionId || i} style={{ borderTop: `1px solid ${C.border}` }}>
+                        <td style={{ padding: '7px 10px', fontSize: 13, color: C.text }}>{a.actionName}</td>
+                        <td style={{ padding: '7px 10px' }}>
+                          <div style={{ background: '#e8e8e8', borderRadius: 3, height: 8, overflow: 'hidden' }}>
+                            <div style={{ width: `${p}%`, height: '100%', background: fill, borderRadius: 3 }} />
+                          </div>
+                        </td>
+                        <td style={{ padding: '7px 10px', textAlign: 'right', fontSize: 13, fontWeight: 600, color: C.text }}>{p.toFixed(1)}%</td>
+                        <td style={{ padding: '7px 10px', textAlign: 'right' }}>
+                          <span style={{ background: '#e6f7fd', color: C.teal, fontSize: 11, padding: '1px 7px', borderRadius: 10, fontWeight: 600 }}>
+                            {a.actionStatus || 'Open'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {modalTab === 'decision' && (
+            <div style={{ textAlign: 'center', padding: 30, color: C.text2 }}>
+              <DecisionIcon color={C.teal} />
+              <div style={{ marginTop: 10, fontSize: 15, fontWeight: 600, color: C.text }}>Decision ({goal.goalName})</div>
+              <div style={{ marginTop: 6, fontSize: 13 }}>No Decision</div>
+              <button style={{ marginTop: 14, padding: '7px 18px', background: '#27ae60', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>
+                + Add Decision
+              </button>
+            </div>
+          )}
+          {modalTab === 'headsup' && (
+            <div style={{ padding: 8 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 10 }}>HeadsUP</div>
+              <textarea
+                placeholder="Maximum 120 characters"
+                maxLength={120}
+                style={{ width: '100%', padding: 10, border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 13, resize: 'vertical', minHeight: 80, boxSizing: 'border-box' }}
+              />
+              <button style={{ marginTop: 8, padding: '7px 18px', background: C.teal, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>
+                Save
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-/* ─── Tabs ───────────────────────────────────────────────────────────────────── */
-const TABS = [
-  { id: 'goals',        label: 'Goals',        Icon: Target   },
-  { id: 'activity',     label: 'Activity',     Icon: Activity },
-  { id: 'contributors', label: 'Contributors', Icon: Users    },
-  { id: 'meetings',     label: 'Meetings',     Icon: Video    },
-  { id: 'notes',        label: 'Notes',        Icon: FileText },
-  { id: 'whatif',       label: 'What-If',      Icon: Zap      },
-];
+/* ─── Add Goal Modal ─────────────────────────────────────────────────────────── */
+function AddGoalModal({ onClose, onAdd, isPending }) {
+  const [form, setForm] = useState({ goalName: '', category: '', targetValue: '', endDate: '' });
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+      <div style={{ background: '#fff', borderRadius: 12, padding: 26, width: '100%', maxWidth: 420 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Add Goal</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={17} /></button>
+        </div>
+        {[
+          { key: 'goalName',    label: 'Goal Name *', type: 'text',   placeholder: 'e.g. Improve public speaking' },
+          { key: 'category',   label: 'Category',    type: 'text',   placeholder: 'e.g. Leadership' },
+          { key: 'targetValue',label: 'Target Value',type: 'number', placeholder: '100' },
+          { key: 'endDate',    label: 'End Date',    type: 'date' },
+        ].map(({ key, label, type, placeholder }) => (
+          <div key={key} style={{ marginBottom: 13 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: '#374151' }}>{label}</label>
+            <input type={type} value={form[key]} placeholder={placeholder}
+              onChange={e => setForm(g => ({ ...g, [key]: e.target.value }))}
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+              onFocus={e => e.target.style.borderColor = C.teal}
+              onBlur={e  => e.target.style.borderColor = '#e2e8f0'}
+            />
+          </div>
+        ))}
+        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: 9, background: '#f8f9fa', border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>Cancel</button>
+          <button onClick={() => onAdd(form)} disabled={isPending || !form.goalName}
+            style={{ flex: 1, padding: 9, background: C.purple, border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 13, color: '#fff', opacity: isPending ? 0.7 : 1 }}
+          >
+            {isPending ? 'Adding…' : 'Add Goal'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function Spinner() {
   return (
@@ -286,12 +533,10 @@ export default function WorkPlan() {
   const queryClient    = useQueryClient();
 
   const planId = searchParams.get('planId');
-  const [activeTab,     setActiveTab]     = useState('goals');
-  const [selectedGoal,  setSelectedGoal]  = useState(null);
   const [showGoalModal, setShowGoalModal] = useState(false);
-  const [newGoal,       setNewGoal]       = useState({ goalName: '', category: '', targetValue: '', endDate: '' });
-  const [noteContent,   setNoteContent]   = useState('');
+  const [chartGoal,     setChartGoal]     = useState(null); // { goal, goalActions }
   const [refreshKey,    setRefreshKey]    = useState(0);
+  const [hideComplete,  setHideComplete]  = useState(false);
 
   /* ── queries ── */
   const plansQuery = useQuery({
@@ -302,66 +547,27 @@ export default function WorkPlan() {
   });
 
   const planQuery = useQuery({
-    queryKey: ['planDetail', planId, entityId, refreshKey],
-    queryFn:  () => api.getGrowthPlanDetails({ action: 'GetPlanDetail', growthPlanId: planId, entityId, companyId }),
-    select:   r  => r.data,
-    enabled:  !!planId && !!entityId,
-    staleTime: 0,
+    queryKey:       ['planDetail', planId, entityId, refreshKey],
+    queryFn:        () => api.getGrowthPlanDetails({ action: 'GetPlanDetail', growthPlanId: planId, entityId, companyId }),
+    select:         r  => r.data,
+    enabled:        !!planId && !!entityId,
+    staleTime:      0,
     refetchOnMount: true,
-  });
-
-  const activityQuery = useQuery({
-    queryKey: ['planActivity', planId, entityId],
-    queryFn:  () => api.getEntityDisplayActivity({ entityId, companyId, filter1: 'ALL' }),
-    select:   r  => r.data?.activities || r.data?.result || [],
-    enabled:  activeTab === 'activity' && !!entityId,
-  });
-
-  const contributorsQuery = useQuery({
-    queryKey: ['contributors', planId, entityId],
-    queryFn:  () => api.getAllContributors({ entityId, companyId, growthPlanId: planId, action: 'GET' }),
-    select:   r  => r.data?.EntityUser || r.data?.contributors || r.data?.result || [],
-    enabled:  activeTab === 'contributors' && !!planId,
-  });
-
-  const meetingsQuery = useQuery({
-    queryKey: ['planMeetings', planId, entityId],
-    queryFn:  () => api.getMeetingsByGrowthPlan({ growthPlanId: planId, entityId, companyId }),
-    select:   r  => r.data?.meeting || r.data?.meetings || r.data?.result || [],
-    enabled:  activeTab === 'meetings' && !!planId,
-  });
-
-  const notesQuery = useQuery({
-    queryKey: ['planNotes', planId, entityId],
-    queryFn:  () => api.getCGPNotes({ growthPlanId: planId, entityId }),
-    select:   r  => r.data?.notes || r.data?.result || [],
-    enabled:  activeTab === 'notes' && !!planId,
   });
 
   /* ── mutations ── */
   const addGoalMutation = useMutation({
-    mutationFn: () => api.goalActionCreate({
+    mutationFn: (form) => api.goalActionCreate({
       entityId, companyId, growthPlanId: planId,
-      action: 'ADDGOAL', goalName: newGoal.goalName,
-      category: newGoal.category, targetValue: Number(newGoal.targetValue), endDate: newGoal.endDate,
+      action: 'ADDGOAL', goalName: form.goalName,
+      category: form.category, targetValue: Number(form.targetValue), endDate: form.endDate,
     }),
     onSuccess: () => {
       toast.success('Goal added!');
       queryClient.invalidateQueries(['planDetail', planId]);
       setShowGoalModal(false);
-      setNewGoal({ goalName: '', category: '', targetValue: '', endDate: '' });
     },
     onError: () => toast.error('Failed to add goal'),
-  });
-
-  const addNoteMutation = useMutation({
-    mutationFn: () => api.getCGPNotes({ action: 'ADD', growthPlanId: planId, entityId, noteContent }),
-    onSuccess: () => {
-      toast.success('Note added!');
-      queryClient.invalidateQueries(['planNotes', planId]);
-      setNoteContent('');
-    },
-    onError: () => toast.error('Failed to add note'),
   });
 
   const doRefresh = () => {
@@ -369,7 +575,7 @@ export default function WorkPlan() {
     queryClient.invalidateQueries(['planDetail', planId]);
   };
 
-  /* ── No planId — show plan selector ── */
+  /* ── No planId: plan selector ── */
   if (!planId) {
     return (
       <div style={{ padding: '24px 32px', background: C.bg, minHeight: '100vh' }}>
@@ -406,14 +612,14 @@ export default function WorkPlan() {
   }
 
   /* ── Parse plan data ── */
-  const rawData  = planQuery.data || {};
-  const plan     = Array.isArray(rawData.growthPlan) ? (rawData.growthPlan[0] || {}) : (rawData.growthPlan || {});
-  const goals    = rawData.goals   || [];
-  const actions  = rawData.actions || [];
-  const percent  = Number(plan.growthPlanPercentAchieved || 0);
+  const rawData    = planQuery.data || {};
+  const plan       = Array.isArray(rawData.growthPlan) ? (rawData.growthPlan[0] || {}) : (rawData.growthPlan || {});
+  const goals      = rawData.goals   || [];
+  const actions    = rawData.actions || [];
+  const percent    = Number(plan.growthPlanPercentAchieved || 0);
   const themeColor = plan.colorCodeHex
     ? (plan.colorCodeHex.startsWith('#') ? plan.colorCodeHex : `#${plan.colorCodeHex}`)
-    : C.purple;
+    : C.teal;
 
   if (planQuery.isLoading) return <div style={{ padding: 32 }}><Spinner /></div>;
   if (planQuery.isError)   return (
@@ -423,315 +629,190 @@ export default function WorkPlan() {
     </div>
   );
 
-  /* Selected goal for right-panel Goals tab */
-  const displayGoal = selectedGoal || (goals.length > 0 ? goals[0] : null);
-  const displayGoalActions = displayGoal
-    ? actions.filter(a => String(a.goalId) === String(displayGoal.goalId))
-    : [];
-
   return (
-    <div style={{ background: C.bg, minHeight: '100vh' }}>
+    <div style={{ background: C.bg, minHeight: '100vh', position: 'relative' }}>
 
-      {/* ── Plan header ── */}
-      <div style={{ background: C.white, borderBottom: `1px solid ${C.border}`, padding: '14px 28px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h1 style={{ margin: 0, fontSize: 21, fontWeight: 700, color: themeColor }}>
-            {plan.name || plan.growthPlanName || 'Plan'}
-          </h1>
-          <ActionToolbar onRefresh={doRefresh} />
+      {/* ── Left edge vertical tabs (Invite + Rate Meeting) — vembu style ── */}
+      <div style={{ position: 'fixed', left: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 50, display: 'flex', flexDirection: 'column', gap: 0, pointerEvents: 'none' }}>
+        <div style={{
+          writingMode: 'vertical-rl', textOrientation: 'mixed', transform: 'rotate(180deg)',
+          background: C.teal, color: '#fff', fontSize: 12, fontWeight: 600,
+          padding: '10px 6px', cursor: 'pointer', letterSpacing: 1,
+          borderRadius: '0 4px 4px 0', pointerEvents: 'auto',
+        }}>
+          Invite
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 36, flexWrap: 'wrap' }}>
-          {/* Due date */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13, color: C.text2 }}>Due Date</span>
-            {(plan.growthPlanMilestoneDate || plan.milestoneDate)
-              ? <span style={{ background: C.teal, color: '#fff', borderRadius: 4, padding: '2px 10px', fontSize: 13, fontWeight: 600 }}>
-                  {new Date(plan.growthPlanMilestoneDate || plan.milestoneDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
-                </span>
-              : <span style={{ color: C.text2 }}>—</span>
-            }
-          </div>
-          {/* Owner */}
-          {(plan.ownerName || plan.firstName) && (
-            <div style={{ fontSize: 13, color: C.text2 }}>
-              Owner: <span style={{ color: C.text, fontWeight: 500 }}>
-                {plan.ownerName || `${plan.firstName || ''} ${plan.lastName || ''}`.trim()}
-              </span>
-            </div>
-          )}
-          {/* Gauge */}
-          <Speedometer percent={percent} />
+        <div style={{
+          writingMode: 'vertical-rl', textOrientation: 'mixed', transform: 'rotate(180deg)',
+          background: C.purple, color: '#fff', fontSize: 12, fontWeight: 600,
+          padding: '10px 6px', cursor: 'pointer', letterSpacing: 1,
+          borderRadius: '0 4px 4px 0', marginTop: 2, pointerEvents: 'auto',
+        }}>
+          Rate Meeting
         </div>
       </div>
 
-      {/* ── Body: left goal+action list | right tabs panel ── */}
-      <div style={{ display: 'flex' }}>
+      {/* ── Main content (left-padded to clear left tabs) ── */}
+      <div style={{ paddingLeft: 28 }}>
 
-        {/* ── LEFT: Goals + Actions ── */}
-        <div style={{ flex: 1, minWidth: 0, borderRight: `1px solid ${C.border}` }}>
-
-          {/* Toolbar row */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '8px 10px', background: C.white, borderBottom: `1px solid ${C.border}`,
-          }}>
-            <button
-              onClick={() => setShowGoalModal(true)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 4,
-                background: C.purple, color: '#fff', border: 'none',
-                borderRadius: 6, padding: '6px 14px', cursor: 'pointer',
-                fontSize: 13, fontWeight: 600,
-              }}
-            >
-              <Plus size={13} /> Add New Goal
-            </button>
-            <div style={{ flex: 1 }} />
-            {/* Filter icon */}
-            <Filter size={15} color={C.text2} style={{ cursor: 'pointer' }} />
-            {/* Column headers */}
-            <div style={{ display: 'flex', alignItems: 'center', fontSize: 12, color: C.text2, fontWeight: 600 }}>
-              <div style={{ width: 200 }}></div>
-              <div style={{ width: 44  }}></div>
-              <div style={{ width: 10  }}></div>
-              <div style={{ flex: 1, textAlign: 'center', minWidth: 80 }}>Progress</div>
-              <div style={{ width: 52, textAlign: 'right' }}></div>
-              <div style={{ width: 92, textAlign: 'right' }}>Due Date</div>
-              <div style={{ width: 22  }}></div>
+        {/* ── Plan header ── */}
+        <div style={{ background: C.white, borderBottom: `1px solid ${C.border}`, padding: '14px 18px 10px 16px', position: 'relative' }}>
+          {/* Row 1: Title + inline icons (left), green refresh (absolute top-right) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, paddingRight: 44 }}>
+            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text, flexShrink: 0 }}>
+              {plan.name || plan.growthPlanName || 'Plan'}
+            </h1>
+            {/* Inline toolbar icons right after title — matches vembu */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginLeft: 6 }}>
+              {TOOLBAR_ICONS.map(({ title, svg }) => (
+                <button key={title} title={title}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '3px 4px', borderRadius: 4, color: C.text2, display: 'flex' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#f0f4f8'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >{svg}</button>
+              ))}
             </div>
           </div>
+          {/* Green refresh — absolute top-right of header, matching vembu */}
+          <button onClick={doRefresh}
+            style={{ position: 'absolute', top: 12, right: 14, background: '#27ae60', border: 'none', borderRadius: '50%', cursor: 'pointer', padding: '6px', color: '#fff', display: 'flex', alignItems: 'center', width: 30, height: 30, justifyContent: 'center' }}
+            title="Refresh"
+          ><RefreshCw size={14} /></button>
 
-          {/* Goals + their actions */}
-          {goals.length === 0 && !planQuery.isLoading && (
-            <div style={{ padding: 40, textAlign: 'center', color: C.text2, fontSize: 14 }}>No goals yet.</div>
-          )}
-          {goals.map((goal, gi) => {
-            const goalActions = actions.filter(a => String(a.goalId) === String(goal.goalId));
-            const isSelected  = displayGoal && String(displayGoal.goalId) === String(goal.goalId);
-            return (
-              <div key={goal.goalId || gi}>
-                <GoalHeaderRow
-                  goal={goal}
-                  goalActions={goalActions}
-                  themeColor={themeColor}
-                  isSelected={isSelected}
-                  onGoalClick={g => { setSelectedGoal(g); setActiveTab('goals'); }}
-                />
-                {goalActions.map((action, ai) => (
-                  <ActionSubRow key={action.actionId || ai} action={action} themeColor={themeColor} />
-                ))}
+          {/* Row 2: Due date + Owner (left) | Gauge (center) | wide progress bar (right) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+            {/* Left meta */}
+            <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 200 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, color: C.text2 }}>Due Date</span>
+                {(plan.growthPlanMilestoneDate || plan.milestoneDate)
+                  ? <span style={{ background: C.purple, color: '#fff', borderRadius: 4, padding: '2px 10px', fontSize: 13, fontWeight: 600 }}>
+                      {new Date(plan.growthPlanMilestoneDate || plan.milestoneDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
+                    </span>
+                  : <span style={{ color: C.text2 }}>—</span>
+                }
               </div>
-            );
-          })}
-        </div>
-
-        {/* ── RIGHT: Tabs panel ── */}
-        <div style={{ flex: '0 0 500px', background: C.white, display: 'flex', flexDirection: 'column' }}>
-
-          {/* Back */}
-          <div style={{ padding: '10px 18px', borderBottom: `1px solid ${C.border}` }}>
-            <button onClick={() => navigate('/dashboard')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.teal, fontSize: 13, padding: 0, display: 'flex', alignItems: 'center', gap: 4 }}
-            >
-              ← Back
-            </button>
-          </div>
-
-          {/* Plan summary in panel */}
-          <div style={{ padding: '14px 18px', borderBottom: `1px solid ${C.border}` }}>
-            <h2 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: C.text }}>
-              {plan.name || plan.growthPlanName}
-            </h2>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
-              <span style={{ background: '#e6f7fd', color: C.teal, fontSize: 12, padding: '2px 8px', borderRadius: 4, fontWeight: 600 }}>
-                {plan.growthPlanStatus || 'Open'}
-              </span>
-              {(plan.growthPlanMilestoneDate || plan.milestoneDate) && (
-                <span style={{ fontSize: 12, color: C.text2 }}>
-                  Due: {new Date(plan.growthPlanMilestoneDate || plan.milestoneDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })}
-                </span>
+              {(plan.ownerName || plan.firstName) && (
+                <div style={{ fontSize: 13, color: C.text2 }}>
+                  Owner: <span style={{ color: C.text, fontWeight: 500 }}>
+                    {plan.ownerName || `${plan.firstName || ''} ${plan.lastName || ''}`.trim()}
+                  </span>
+                </div>
               )}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: C.text2, marginBottom: 4 }}>
-              <span>Overall Progress</span>
-              <span style={{ fontWeight: 700, color: C.text }}>{percent.toFixed(2)}%</span>
-            </div>
-            <div style={{ background: '#e4e7ea', borderRadius: 4, height: 7 }}>
-              <div style={{ width: `${percent}%`, height: '100%', background: C.teal, borderRadius: 4 }} />
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, overflowX: 'auto' }}>
-            {TABS.map(({ id, label, Icon }) => (
-              <button key={id} onClick={() => setActiveTab(id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  padding: '9px 13px', border: 'none', background: 'transparent',
-                  cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap',
-                  fontWeight: activeTab === id ? 600 : 400,
-                  color: activeTab === id ? C.teal : C.text2,
-                  borderBottom: activeTab === id ? `2px solid ${C.teal}` : '2px solid transparent',
-                  marginBottom: -1,
-                }}
-              >
-                <Icon size={12} /> {label}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab content */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '14px 18px' }}>
-
-            {/* Goals tab — shows selected goal's actions */}
-            {activeTab === 'goals' && (
-              <div>
-                <button onClick={() => setShowGoalModal(true)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: C.purple, color: '#fff', border: 'none', borderRadius: 6, padding: '7px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600, marginBottom: 14, marginLeft: 'auto' }}
-                >
-                  <Plus size={13} /> Add Goal
-                </button>
-
-                {goals.length === 0 && <div style={{ color: C.text2, fontSize: 14 }}>No goals yet.</div>}
-
-                {goals.map((goal, gi) => {
-                  const gActions = actions.filter(a => String(a.goalId) === String(goal.goalId));
-                  return (
-                    <div key={goal.goalId || gi} style={{ marginBottom: 14 }}>
-                      {/* Goal title */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                        <span style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{goal.goalName || goal.name}</span>
-                        <span style={{ background: '#e6f7fd', color: C.teal, fontSize: 11, padding: '1px 7px', borderRadius: 10, fontWeight: 600 }}>{goal.goalStatus || 'Open'}</span>
-                      </div>
-                      {/* Actions list */}
-                      {gActions.map((a, ai) => (
-                        <div key={a.actionId || ai} style={{
-                          fontSize: 13, color: C.text, padding: '4px 0 4px 10px',
-                          borderTop: `1px solid ${C.border}`,
-                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        }}>
-                          <span>• {a.actionName}</span>
-                          <span style={{ color: C.teal, fontSize: 11, fontWeight: 600, marginLeft: 8 }}>{a.actionStatus || 'Open'}</span>
-                        </div>
-                      ))}
-                      {gActions.length === 0 && (
-                        <div style={{ fontSize: 12, color: C.text2, paddingLeft: 10 }}>No actions yet.</div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {activeTab === 'activity' && (
-              activityQuery.isLoading ? <Spinner /> :
-                (activityQuery.data || []).length === 0
-                  ? <div style={{ color: C.text2, fontSize: 14 }}>No activity yet.</div>
-                  : (activityQuery.data || []).map((item, i) => (
-                      <div key={i} style={{ padding: '8px 0', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.text }}>
-                        <div>{item.auditMessage || item.message}</div>
-                        {item.createdOn && <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>{new Date(item.createdOn).toLocaleString()}</div>}
-                      </div>
-                    ))
-            )}
-
-            {activeTab === 'contributors' && (
-              contributorsQuery.isLoading ? <Spinner /> :
-                (contributorsQuery.data || []).length === 0
-                  ? <div style={{ color: C.text2, fontSize: 14 }}>No contributors.</div>
-                  : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {(contributorsQuery.data || []).map((c, i) => (
-                        <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', background: '#f8f9fa', borderRadius: 6 }}>
-                          <div style={{ width: 32, height: 32, borderRadius: '50%', background: C.teal, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
-                            {(c.firstName || c.email || 'U')[0].toUpperCase()}
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{c.firstName ? `${c.firstName} ${c.lastName || ''}`.trim() : c.email}</div>
-                            {c.email && c.firstName && <div style={{ fontSize: 11, color: C.text2 }}>{c.email}</div>}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-            )}
-
-            {activeTab === 'meetings' && (
-              meetingsQuery.isLoading ? <Spinner /> :
-                (meetingsQuery.data || []).length === 0
-                  ? <div style={{ color: C.text2, fontSize: 14 }}>No meetings.</div>
-                  : (meetingsQuery.data || []).map((m, i) => (
-                      <div key={i} style={{ padding: '8px 10px', background: '#f8f9fa', borderRadius: 6, marginBottom: 8 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{m.meetingTitle || m.title}</div>
-                        {m.meetingDate && <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>{new Date(m.meetingDate).toLocaleString()}</div>}
-                      </div>
-                    ))
-            )}
-
-            {activeTab === 'notes' && (
-              <div>
-                <div style={{ marginBottom: 14 }}>
-                  <ReactQuill value={noteContent} onChange={setNoteContent} placeholder="Write your note here…" style={{ background: '#fff', borderRadius: 6 }} />
-                  <button onClick={() => addNoteMutation.mutate()}
-                    disabled={addNoteMutation.isPending || !noteContent}
-                    style={{ marginTop: 8, padding: '7px 18px', background: C.teal, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: addNoteMutation.isPending ? 0.7 : 1 }}
-                  >
-                    {addNoteMutation.isPending ? 'Saving…' : 'Add Note'}
-                  </button>
-                </div>
-                {notesQuery.isLoading ? <Spinner /> : (notesQuery.data || []).map((note, i) => (
-                  <div key={i} style={{ padding: 10, background: '#f8f9fa', borderRadius: 6, marginBottom: 8, fontSize: 13, color: C.text }}>
-                    <div style={{ fontSize: 11, color: C.text2, marginBottom: 4 }}>{note.createdOn ? new Date(note.createdOn).toLocaleString() : ''}</div>
-                    <div dangerouslySetInnerHTML={{ __html: note.noteContent || note.content || '' }} />
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {activeTab === 'whatif' && (
-              <div style={{ textAlign: 'center', padding: '40px 20px', color: C.text2 }}>
-                <Zap size={30} color={C.teal} style={{ marginBottom: 10 }} />
-                <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>What-If Analysis</div>
-                <div style={{ fontSize: 13, marginTop: 8 }}>Explore hypothetical scenarios.</div>
-              </div>
-            )}
+            {/* Gauge + progress bar — fills remaining space */}
+            <Speedometer percent={percent} />
           </div>
         </div>
+
+        {/* ── Toolbar row: up-arrow + toggle + Add Goal + filter ── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '8px 16px', background: C.white, borderBottom: `1px solid ${C.border}`,
+        }}>
+          {/* Up arrow */}
+          <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text2, display: 'flex', padding: '4px 4px' }}>
+            <ArrowUp size={15} />
+          </button>
+          {/* Toggle switch */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: C.text2 }}>
+            <div
+              onClick={() => setHideComplete(v => !v)}
+              style={{
+                width: 34, height: 18, borderRadius: 9, background: hideComplete ? C.teal : '#ccc',
+                position: 'relative', cursor: 'pointer', transition: 'background .2s',
+              }}
+            >
+              <div style={{
+                position: 'absolute', top: 2, left: hideComplete ? 16 : 2,
+                width: 14, height: 14, borderRadius: '50%', background: '#fff',
+                transition: 'left .2s', boxShadow: '0 1px 2px rgba(0,0,0,.2)',
+              }} />
+            </div>
+          </label>
+
+          {/* Add New Goal */}
+          <button
+            onClick={() => setShowGoalModal(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              background: C.purple, color: '#fff', border: 'none',
+              borderRadius: 5, padding: '6px 14px', cursor: 'pointer',
+              fontSize: 13, fontWeight: 600,
+            }}
+          >
+            <Plus size={13} /> Add New Goal
+          </button>
+
+          <div style={{ flex: 1 }} />
+
+          {/* Filter + column headers */}
+          <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke={C.text2} strokeWidth={2} style={{ cursor: 'pointer' }}>
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+          </svg>
+          <div style={{ display: 'flex', alignItems: 'center', fontSize: 12, color: C.text2, fontWeight: 600, gap: 8, marginLeft: 8 }}>
+            <span style={{ minWidth: 80, textAlign: 'center' }}>Progress</span>
+            <span style={{ minWidth: 100, textAlign: 'right' }}>Due Date</span>
+          </div>
+        </div>
+
+        {/* ── Goals + actions table ── */}
+        {planQuery.isLoading && <Spinner />}
+        {!planQuery.isLoading && goals.length === 0 && (
+          <div style={{ padding: 40, textAlign: 'center', color: C.text2, fontSize: 14 }}>No goals yet. Click "+ Add New Goal" to get started.</div>
+        )}
+
+        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: 4 }} />
+            <col style={{ width: 44 }} />
+            <col style={{ width: 261 }} />
+            <col style={{ width: 20 }} />
+            <col style={{ width: 48 }} />
+            <col />
+            <col style={{ width: 66 }} />
+            <col style={{ width: 120 }} />
+          </colgroup>
+          <tbody>
+            {goals.map((goal, gi) => {
+              const goalActions = actions.filter(a => String(a.goalId) === String(goal.goalId));
+              const visibleActions = hideComplete
+                ? goalActions.filter(a => Number(a.actionGoalPercentAchieve || 0) < 100)
+                : goalActions;
+              return [
+                <GoalRow
+                  key={`g-${goal.goalId || gi}`}
+                  goal={goal}
+                  goalActions={goalActions}
+                  onChartClick={(g, ga) => setChartGoal({ goal: g, goalActions: ga })}
+                />,
+                ...visibleActions.map((action, ai) => (
+                  <ActionRow
+                    key={`a-${action.actionId || ai}`}
+                    action={action}
+                    themeColor={themeColor}
+                  />
+                )),
+              ];
+            })}
+          </tbody>
+        </table>
       </div>
 
-      {/* ── Add Goal Modal ── */}
+      {/* ── Modals ── */}
       {showGoalModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: 26, width: '100%', maxWidth: 420 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Add Goal</h2>
-              <button onClick={() => setShowGoalModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={17} /></button>
-            </div>
-            {[
-              { key: 'goalName',    label: 'Goal Name *', type: 'text',   placeholder: 'e.g. Improve public speaking' },
-              { key: 'category',   label: 'Category',    type: 'text',   placeholder: 'e.g. Leadership' },
-              { key: 'targetValue',label: 'Target Value',type: 'number', placeholder: '100' },
-              { key: 'endDate',    label: 'End Date',    type: 'date'  },
-            ].map(({ key, label, type, placeholder }) => (
-              <div key={key} style={{ marginBottom: 13 }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: '#374151' }}>{label}</label>
-                <input type={type} value={newGoal[key]} placeholder={placeholder}
-                  onChange={e => setNewGoal(g => ({ ...g, [key]: e.target.value }))}
-                  style={{ width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
-                  onFocus={e => e.target.style.borderColor = C.teal}
-                  onBlur={e  => e.target.style.borderColor = '#e2e8f0'}
-                />
-              </div>
-            ))}
-            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-              <button onClick={() => setShowGoalModal(false)} style={{ flex: 1, padding: 9, background: '#f8f9fa', border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>Cancel</button>
-              <button onClick={() => addGoalMutation.mutate()} disabled={addGoalMutation.isPending || !newGoal.goalName}
-                style={{ flex: 1, padding: 9, background: C.purple, border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 13, color: '#fff', opacity: addGoalMutation.isPending ? 0.7 : 1 }}
-              >
-                {addGoalMutation.isPending ? 'Adding…' : 'Add Goal'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <AddGoalModal
+          onClose={() => setShowGoalModal(false)}
+          onAdd={(form) => addGoalMutation.mutate(form)}
+          isPending={addGoalMutation.isPending}
+        />
+      )}
+      {chartGoal && (
+        <GoalChartModal
+          goal={chartGoal.goal}
+          goalActions={chartGoal.goalActions}
+          onClose={() => setChartGoal(null)}
+        />
       )}
     </div>
   );
