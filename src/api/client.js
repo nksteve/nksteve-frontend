@@ -102,3 +102,7 @@ export const updateTrainingCategory = (data) => http.post('/trainingCategory', d
 export const updatePreferences = (data) => http.post('/preferences', data);
 
 export const getMyPlans = (data) => http.post('/getMyPlans', data);
+
+// Notes & Documents
+export const updateGoalActionNotes = (data) => http.post('/updateGoalActionNotes', data);
+export const updateGoalfile        = (data) => http.post('/updateGoalfile', data);

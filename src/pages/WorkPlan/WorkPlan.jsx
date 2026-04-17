@@ -9,6 +9,7 @@ import {
 import { Slider } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import * as api from '../../api/client';
+import DOMPurify from 'dompurify';
 import useAuthStore from '../../store/authStore';
 
 /* ─── Design tokens ────────────────────────────────────────────────────────── */
@@ -247,7 +248,7 @@ function YellowDot() {
 }
 
 /* ─── Goal header row — purple band matching vembu ─────────────────────────── */
-function GoalRow({ goal, goalActions, onChartClick }) {
+function GoalRow({ goal, goalActions, onChartClick, onNoteClick, onFileClick }) {
   // Aggregate % from actions (average of actionGoalPercentAchieve)
   const actionPcts = goalActions.map(a => Number(a.actionGoalPercentAchieve || 0));
   const aggPct     = actionPcts.length > 0
@@ -286,8 +287,14 @@ function GoalRow({ goal, goalActions, onChartClick }) {
             {goal.goalName || '—'}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 4 }}>
-            <NoteIcon color={C.teal} />
-            <FolderIcon color={C.teal} />
+            <button onClick={onNoteClick} title="Notes" style={{ background:'none',border:'none',cursor:'pointer',padding:0,position:'relative',display:'flex' }}>
+              <NoteIcon color={goal.notesCount > 0 ? C.teal : '#adb5bd'} />
+              {goal.notesCount > 0 && <span style={{ position:'absolute',top:-4,right:-4,background:C.teal,color:'#fff',borderRadius:'50%',fontSize:8,width:12,height:12,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700 }}>{goal.notesCount}</span>}
+            </button>
+            <button onClick={onFileClick} title="Files" style={{ background:'none',border:'none',cursor:'pointer',padding:0,position:'relative',display:'flex' }}>
+              <FolderIcon color={goal.docsCount > 0 ? C.teal : '#adb5bd'} />
+              {goal.docsCount > 0 && <span style={{ position:'absolute',top:-4,right:-4,background:C.teal,color:'#fff',borderRadius:'50%',fontSize:8,width:12,height:12,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700 }}>{goal.docsCount}</span>}
+            </button>
           </div>
         </div>
       </td>
@@ -331,7 +338,7 @@ function GoalRow({ goal, goalActions, onChartClick }) {
 }
 
 /* ─── Action sub-row — white background, vembu style ────────────────────────── */
-function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisionClick }) {
+function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisionClick, onNoteClick, onFileClick }) {
   const pct        = Math.min(100, Number(action.actionGoalPercentAchieve || 0));
   const [localPct, setLocalPct] = useState(pct);
   const endDate    = action.endDate || action.milestoneDate;
@@ -366,8 +373,14 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
             {action.actionName || '—'}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 4 }}>
-            <NoteIcon color={planColor} />
-            <FolderIcon color={planColor} />
+            <button onClick={onNoteClick} title="Notes" style={{ background:'none',border:'none',cursor:'pointer',padding:0,position:'relative',display:'flex' }}>
+              <NoteIcon color={action.notesCount > 0 ? planColor : '#adb5bd'} />
+              {action.notesCount > 0 && <span style={{ position:'absolute',top:-4,right:-4,background:planColor,color:'#fff',borderRadius:'50%',fontSize:8,width:12,height:12,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700 }}>{action.notesCount}</span>}
+            </button>
+            <button onClick={onFileClick} title="Files" style={{ background:'none',border:'none',cursor:'pointer',padding:0,position:'relative',display:'flex' }}>
+              <FolderIcon color={action.docsCount > 0 ? planColor : '#adb5bd'} />
+              {action.docsCount > 0 && <span style={{ position:'absolute',top:-4,right:-4,background:planColor,color:'#fff',borderRadius:'50%',fontSize:8,width:12,height:12,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700 }}>{action.docsCount}</span>}
+            </button>
           </div>
         </div>
       </td>
@@ -429,6 +442,198 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
 }
 
 /* ─── Goal Chart Modal ────────────────────────────────────────────────────────── */
+/* ─── Notes Modal ──────────────────────────────────────────────────────────────────── */
+function NotesModal({ onClose, growthPlanId, goalTagId, actionTagId, planColor }) {
+  const user = useAuthStore(s => s.user);
+  const [notes, setNotes]   = useState([]);
+  const [text, setText]     = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving]   = useState(false);
+  const title = actionTagId ? 'Action Notes' : 'Goal Notes';
+
+  useEffect(() => { fetchNotes(); }, []);
+
+  async function fetchNotes() {
+    setLoading(true);
+    try {
+      const res = await api.updateGoalActionNotes({ action: 'GET', growthPlanId, goalTagId, actionTagId });
+      setNotes(res.data.result || []);
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  }
+
+  async function saveNote() {
+    if (!text.trim()) return;
+    setSaving(true);
+    try {
+      const res = await api.updateGoalActionNotes({
+        action: 'ADD', growthPlanId, goalTagId, actionTagId,
+        entityId: user?.entityId, notesType: 'public',
+        notes: `<p>${text}</p>-`,
+      });
+      setNotes(res.data.result || []);
+      setText('');
+    } catch(e) { toast.error('Failed to save note'); }
+    setSaving(false);
+  }
+
+  async function deleteNote(notesId) {
+    try {
+      await api.updateGoalActionNotes({ action: 'DELETE', growthPlanId, notesId });
+      setNotes(prev => prev.filter(n => n.notesId !== notesId));
+    } catch(e) { toast.error('Failed to delete note'); }
+  }
+
+  const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' };
+  const modal   = { background: '#fff', borderRadius: 8, width: 560, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' };
+  const header  = { background: planColor || C.teal, color: '#fff', padding: '14px 20px', borderRadius: '8px 8px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' };
+
+  return (
+    <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={modal}>
+        <div style={header}>
+          <span style={{ fontWeight: 700, fontSize: 16 }}>{title}</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>×</button>
+        </div>
+        <div style={{ padding: 16, borderBottom: '1px solid #e8e8e8' }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <textarea
+              value={text}
+              onChange={e => setText(e.target.value)}
+              placeholder="Add a note..."
+              rows={3}
+              style={{ flex: 1, border: '1px solid #c8ced3', borderRadius: 4, padding: '6px 10px', fontSize: 13, resize: 'vertical', fontFamily: 'inherit' }}
+            />
+            <button
+              onClick={saveNote}
+              disabled={saving || !text.trim()}
+              style={{ background: planColor || C.teal, color: '#fff', border: 'none', borderRadius: 4, padding: '0 16px', cursor: 'pointer', fontWeight: 600, fontSize: 13, opacity: saving || !text.trim() ? 0.6 : 1 }}
+            >{saving ? 'Saving...' : 'Save'}</button>
+          </div>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+          {loading ? <div style={{ textAlign: 'center', color: C.text2, padding: 24 }}>Loading...</div>
+          : notes.length === 0 ? <div style={{ textAlign: 'center', color: C.text2, padding: 24, fontSize: 13 }}>No notes yet.</div>
+          : notes.map(n => (
+            <div key={n.notesId} style={{ marginBottom: 12, padding: '10px 14px', background: '#f8f9fa', borderRadius: 6, borderLeft: `3px solid ${planColor || C.teal}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 11, color: C.text2 }}>{new Date(n.created).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                {n.entityId === user?.entityId && (
+                  <button onClick={() => deleteNote(n.notesId)} style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer', fontSize: 12, padding: 0 }}>Delete</button>
+                )}
+              </div>
+              <div style={{ fontSize: 13, color: C.text }} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(n.notes || '') }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Files Modal ───────────────────────────────────────────────────────────────────── */
+function FilesModal({ onClose, growthPlanId, goalTagId, actionTagId, planColor }) {
+  const [docs, setDocs]         = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [linkMode, setLinkMode] = useState(false);
+  const [linkUrl, setLinkUrl]   = useState('');
+  const [linkName, setLinkName] = useState('');
+  const title = actionTagId ? 'Action Files' : 'Goal Files';
+
+  useEffect(() => { fetchDocs(); }, []);
+
+  async function fetchDocs() {
+    setLoading(true);
+    try {
+      const res = await api.updateGoalfile({ action: 'GET', growthPlanId, goalTagId, actionTagId });
+      setDocs(res.data.result || []);
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  }
+
+  async function addLink() {
+    if (!linkUrl.trim()) return;
+    setUploading(true);
+    try {
+      const res = await api.updateGoalfile({
+        action: 'ADD', growthPlanId, goalTagId, actionTagId,
+        fileName: linkName.trim() || linkUrl, fileUrl: linkUrl.trim(),
+      });
+      setDocs(res.data.result || []);
+      setLinkUrl(''); setLinkName(''); setLinkMode(false);
+    } catch(e) { toast.error('Failed to add link'); }
+    setUploading(false);
+  }
+
+  async function deleteDoc(documentId) {
+    try {
+      await api.updateGoalfile({ action: 'DELETE', growthPlanId, documentId });
+      setDocs(prev => prev.filter(d => d.documentId !== documentId));
+    } catch(e) { toast.error('Failed to delete file'); }
+  }
+
+  function getFileIcon(url) {
+    if (!url) return '📎';
+    const ext = url.split('.').pop().toLowerCase();
+    if (['jpg','jpeg','png','gif','webp'].includes(ext)) return '🖼️';
+    if (ext === 'pdf') return '📄';
+    if (['doc','docx'].includes(ext)) return '📃';
+    if (['xls','xlsx'].includes(ext)) return '📊';
+    if (['ppt','pptx'].includes(ext)) return '📋';
+    if (['mp4','mov','avi'].includes(ext)) return '🎥';
+    return '📎';
+  }
+
+  const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' };
+  const modal   = { background: '#fff', borderRadius: 8, width: 580, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' };
+  const header  = { background: planColor || C.teal, color: '#fff', padding: '14px 20px', borderRadius: '8px 8px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' };
+
+  return (
+    <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={modal}>
+        <div style={header}>
+          <span style={{ fontWeight: 700, fontSize: 16 }}>{title}</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>×</button>
+        </div>
+        {/* Add link */}
+        <div style={{ padding: 16, borderBottom: '1px solid #e8e8e8' }}>
+          {!linkMode ? (
+            <button
+              onClick={() => setLinkMode(true)}
+              style={{ background: planColor || C.teal, color: '#fff', border: 'none', borderRadius: 4, padding: '7px 16px', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}
+            >+ Add Link</button>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <input value={linkUrl} onChange={e => setLinkUrl(e.target.value)} placeholder="URL (https://...)" style={{ border: '1px solid #c8ced3', borderRadius: 4, padding: '6px 10px', fontSize: 13 }} />
+              <input value={linkName} onChange={e => setLinkName(e.target.value)} placeholder="Display name (optional)" style={{ border: '1px solid #c8ced3', borderRadius: 4, padding: '6px 10px', fontSize: 13 }} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={addLink} disabled={uploading || !linkUrl.trim()} style={{ background: planColor || C.teal, color: '#fff', border: 'none', borderRadius: 4, padding: '6px 16px', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>{uploading ? 'Adding...' : 'Add'}</button>
+                <button onClick={() => { setLinkMode(false); setLinkUrl(''); setLinkName(''); }} style={{ background: '#6c757d', color: '#fff', border: 'none', borderRadius: 4, padding: '6px 16px', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
+        {/* File list */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+          {loading ? <div style={{ textAlign: 'center', color: C.text2, padding: 24 }}>Loading...</div>
+          : docs.length === 0 ? <div style={{ textAlign: 'center', color: C.text2, padding: 24, fontSize: 13 }}>No files yet.</div>
+          : docs.map(d => (
+            <div key={d.documentId} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, padding: '8px 12px', background: '#f8f9fa', borderRadius: 6, borderLeft: `3px solid ${planColor || C.teal}` }}>
+              <span style={{ fontSize: 20 }}>{getFileIcon(d.fileUrl)}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <a href={d.fileUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: planColor || C.teal, fontWeight: 600, textDecoration: 'none', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fileName}</a>
+                <span style={{ fontSize: 11, color: C.text2 }}>{new Date(d.created).toLocaleDateString()}</span>
+              </div>
+              <button onClick={() => deleteDoc(d.documentId)} style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer', fontSize: 12, flexShrink: 0 }}>Remove</button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const MODAL_TABS = [
   { id: 'chart',    Icon: BarChart2,      label: 'Chart' },
   { id: 'decision', Icon: DecisionIcon,   label: 'Decision' },
@@ -615,6 +820,8 @@ export default function WorkPlan() {
   const planId = searchParams.get('planId');
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [chartGoal,     setChartGoal]     = useState(null); // { goal, goalActions }
+  const [notesCtx,      setNotesCtx]      = useState(null); // { growthPlanId, goalTagId, actionTagId, planColor }
+  const [filesCtx,      setFilesCtx]      = useState(null); // { growthPlanId, goalTagId, actionTagId, planColor }
   const [refreshKey,    setRefreshKey]    = useState(0);
   const [hideComplete,  setHideComplete]  = useState(false);
   const [sortBy,        setSortBy]        = useState(''); // '' | 'Goal' | 'DueDate' | 'Status'
@@ -946,6 +1153,8 @@ export default function WorkPlan() {
                   goal={goal}
                   goalActions={goalActions}
                   onChartClick={(g, ga) => setChartGoal({ goal: g, goalActions: ga, initialTab: 'chart' })}
+                  onNoteClick={() => setNotesCtx({ growthPlanId: Number(planId), goalTagId: goal.goalTagId, actionTagId: null, planColor: themeColor })}
+                  onFileClick={() => setFilesCtx({ growthPlanId: Number(planId), goalTagId: goal.goalTagId, actionTagId: null, planColor: themeColor })}
                 />,
                 ...visibleActions.map((action, ai) => (
                   <ActionRow
@@ -954,6 +1163,8 @@ export default function WorkPlan() {
                     themeColor={themeColor}
                     onChartClick={() => setChartGoal({ goal, goalActions, initialTab: 'chart' })}
                     onDecisionClick={() => setChartGoal({ goal, goalActions, initialTab: 'decision' })}
+                    onNoteClick={() => setNotesCtx({ growthPlanId: Number(planId), goalTagId: action.goalId, actionTagId: action.actionTagId, planColor: themeColor })}
+                    onFileClick={() => setFilesCtx({ growthPlanId: Number(planId), goalTagId: action.goalId, actionTagId: action.actionTagId, planColor: themeColor })}
                     onSliderCommit={(progress) => {
                       api.updateActionProgress({
                         updateDelete: 'PROGRESS',
@@ -992,6 +1203,18 @@ export default function WorkPlan() {
           goalActions={chartGoal.goalActions}
           initialTab={chartGoal.initialTab || 'chart'}
           onClose={() => setChartGoal(null)}
+        />
+      )}
+      {notesCtx && (
+        <NotesModal
+          {...notesCtx}
+          onClose={() => setNotesCtx(null)}
+        />
+      )}
+      {filesCtx && (
+        <FilesModal
+          {...filesCtx}
+          onClose={() => setFilesCtx(null)}
         />
       )}
     </div>
