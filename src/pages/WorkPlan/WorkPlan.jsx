@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
@@ -146,41 +146,52 @@ function GoalProgressBar({ pct, goalMin, goalStretch, themeColor }) {
 function sliderColor(pct) {
   if (pct >= 80) return '#0B6623';
   if (pct >= 50) return '#008ECC';
-  return 'orange';
+  return '#ffa500';
 }
+
+// IMPORTANT: PrettoSlider must be defined OUTSIDE the component render.
+// Defining styled() inside a component causes React to unmount/remount on every
+// render, which completely breaks drag interaction.
+const makeSlider = (color) => styled(Slider)({
+  color,
+  height: 8,
+  padding: '13px 0',
+  '& .MuiSlider-thumb': {
+    height: 22,
+    width: 22,
+    backgroundColor: '#fff',
+    border: '2px solid currentColor',
+    boxShadow: '0 1px 4px rgba(0,0,0,.2)',
+    '&:focus,&:hover,&.Mui-active': { boxShadow: '0 0 0 6px rgba(0,0,0,.1)' },
+  },
+  '& .MuiSlider-track': { height: 8, borderRadius: 4 },
+  '& .MuiSlider-rail':  { height: 8, borderRadius: 4, opacity: 0.28 },
+  '& .MuiSlider-valueLabel': { fontSize: 11, background: color },
+});
+
+// Pre-build the 3 color variants — reused across all sliders, no remounting
+const SliderOrange = makeSlider('#ffa500');
+const SliderBlue   = makeSlider('#008ECC');
+const SliderGreen  = makeSlider('#0B6623');
 
 function ActionSlider({ pct, onCommit }) {
   const p = Math.min(100, Math.max(0, Number(pct) || 0));
   const [localVal, setLocalVal] = useState(p);
-  const color = sliderColor(localVal);
 
-  // Rebuild styled slider whenever color changes
-  const PrettoSlider = styled(Slider)({
-    color,
-    height: 6,
-    padding: '10px 0',
-    '& .MuiSlider-thumb': {
-      height: 20,
-      width: 20,
-      backgroundColor: '#fff',
-      border: '2px solid currentColor',
-      '&:focus,&:hover,&.Mui-active': { boxShadow: 'inherit' },
-    },
-    '& .MuiSlider-track': { height: 6, borderRadius: 3 },
-    '& .MuiSlider-rail': { height: 6, borderRadius: 3, opacity: 0.3 },
-    '& .MuiSlider-valueLabel': {
-      fontSize: 11, background: color,
-    },
-  });
+  // Sync when the prop changes (e.g. after refetch)
+  useEffect(() => {
+    setLocalVal(Math.min(100, Math.max(0, Number(pct) || 0)));
+  }, [pct]);
+
+  // Pick pre-built slider by color bucket — no recreation on render
+  const PrettoSlider = localVal >= 80 ? SliderGreen : localVal >= 50 ? SliderBlue : SliderOrange;
 
   return (
     <div style={{ flex: 1, padding: '0 8px', display: 'flex', alignItems: 'center' }}>
       <PrettoSlider
         value={localVal}
         valueLabelDisplay="auto"
-        onChange={(_, val) => {
-          setLocalVal(val);
-        }}
+        onChange={(_, val) => setLocalVal(val)}
         onChangeCommitted={(_, val) => {
           setLocalVal(val);
           onCommit && onCommit(val / 100);
