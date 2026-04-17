@@ -6,8 +6,8 @@ import * as api from '../../api/client';
 import useAuthStore from '../../store/authStore';
 
 const C = {
-  primary: '#4F46E5',
-  primaryLight: '#EEF2FF',
+  primary: '#0197cc',
+  primaryLight: '#e6f7fd',
   success: '#10B981',
   warning: '#F59E0B',
   surface: '#FFFFFF',
@@ -19,7 +19,7 @@ const C = {
 
 function StatusBadge({ status }) {
   const map = {
-    Scheduled: { bg: '#EEF2FF', color: '#4F46E5' },
+    Scheduled: { bg: '#e6f7fd', color: '#0197cc' },
     Completed: { bg: '#ECFDF5', color: '#065F46' },
     Cancelled: { bg: '#FEF2F2', color: '#991B1B' },
     default: { bg: '#F1F5F9', color: '#475569' },

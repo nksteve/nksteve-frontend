@@ -4,8 +4,8 @@ import * as api from '../../api/client';
 import useAuthStore from '../../store/authStore';
 
 const C = {
-  primary: '#4F46E5',
-  primaryLight: '#EEF2FF',
+  primary: '#0197cc',
+  primaryLight: '#e6f7fd',
   success: '#10B981',
   warning: '#F59E0B',
   surface: '#FFFFFF',
@@ -43,6 +43,15 @@ export default function AdminLandingPage() {
   const { user } = useAuthStore();
   const entityId = user?.entityId;
   const companyId = user?.companyId;
+
+  const { data: setupData } = useQuery({
+    queryKey: ['entitySetup', entityId],
+    queryFn: () => api.getEntitySetup(entityId),
+    enabled: !!entityId,
+    select: r => r.data?.entity || {},
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
 
   const usersQuery = useQuery({
     queryKey: ['adminUsers', companyId],
@@ -93,7 +102,7 @@ export default function AdminLandingPage() {
           </div>
           <div>
             <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: C.text }}>
-              Welcome back, {user?.email?.split('@')[0] || 'Admin'}
+              Welcome back, {setupData?.firstName ? `${setupData.firstName} ${setupData.lastName || ''}`.trim() : (user?.email?.split('@')[0] || 'Admin')}
             </h1>
             <p style={{ margin: '2px 0 0', color: C.text2, fontSize: 14 }}>Admin Dashboard</p>
           </div>

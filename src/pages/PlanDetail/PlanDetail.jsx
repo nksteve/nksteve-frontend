@@ -9,9 +9,9 @@ import * as api from '../../api/client';
 import useAuthStore from '../../store/authStore';
 
 const C = {
-  primary: '#4F46E5',
-  primaryLight: '#EEF2FF',
-  success: '#10B981',
+  primary: '#0197cc',
+  primaryLight: '#e6f7fd',
+  success: '#00e15a',
   warning: '#F59E0B',
   danger: '#EF4444',
   surface: '#FFFFFF',
@@ -32,8 +32,8 @@ function Spinner() {
 
 function StatusBadge({ status }) {
   const map = {
-    Open: { bg: '#EEF2FF', color: '#4F46E5' },
-    Active: { bg: '#EEF2FF', color: '#4F46E5' },
+    Open: { bg: '#e6f7fd', color: '#0197cc' },
+    Active: { bg: '#e6f7fd', color: '#0197cc' },
     Complete: { bg: '#ECFDF5', color: '#065F46' },
     Completed: { bg: '#ECFDF5', color: '#065F46' },
     default: { bg: '#F1F5F9', color: '#475569' },
@@ -459,7 +459,7 @@ function NotesTab({ query, noteContent, setNoteContent, onSave, isSaving }) {
 function WhatIfTab() {
   return (
     <div style={{ textAlign: 'center', padding: '80px 24px', background: C.surface, borderRadius: 12, border: `1px solid ${C.border}` }}>
-      <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'linear-gradient(135deg, #EEF2FF, #C7D2FE)', margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'linear-gradient(135deg, #e6f7fd, #b3e5f5)', margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Zap size={28} color={C.primary} />
       </div>
       <h2 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 700, color: C.text }}>What-If Analysis</h2>

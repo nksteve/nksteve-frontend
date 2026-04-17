@@ -8,8 +8,8 @@ import * as api from '../../api/client';
 import useAuthStore from '../../store/authStore';
 
 const C = {
-  primary: '#4F46E5',
-  primaryLight: '#EEF2FF',
+  primary: '#0197cc',
+  primaryLight: '#e6f7fd',
   surface: '#FFFFFF',
   bg: '#F8FAFC',
   border: '#E2E8F0',

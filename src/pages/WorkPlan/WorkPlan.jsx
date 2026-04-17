@@ -4,8 +4,8 @@ import * as api from '../../api/client';
 import useAuthStore from '../../store/authStore';
 
 const C = {
-  primary: '#4F46E5',
-  primaryLight: '#EEF2FF',
+  primary: '#0197cc',
+  primaryLight: '#e6f7fd',
   success: '#10B981',
   warning: '#F59E0B',
   surface: '#FFFFFF',

@@ -7,8 +7,8 @@ import * as api from '../../api/client';
 import useAuthStore from '../../store/authStore';
 
 const C = {
-  primary: '#4F46E5',
-  primaryLight: '#EEF2FF',
+  primary: '#0197cc',
+  primaryLight: '#e6f7fd',
   danger: '#EF4444',
   surface: '#FFFFFF',
   bg: '#F8FAFC',
@@ -176,7 +176,7 @@ function InputField({ label, type, icon, value, onChange, placeholder, suffix })
             transition: 'border-color 0.15s',
             paddingRight: suffix ? 40 : 12,
           }}
-          onFocus={e => e.target.style.borderColor = '#4F46E5'}
+          onFocus={e => e.target.style.borderColor = '#0197cc'}
           onBlur={e => e.target.style.borderColor = '#D1D5DB'}
         />
         {suffix && <span style={{ position: 'absolute', right: 12 }}>{suffix}</span>}

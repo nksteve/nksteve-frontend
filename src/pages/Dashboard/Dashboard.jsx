@@ -265,8 +265,9 @@ function NewPlanModal({ onClose, onCreated, entityId, companyId }) {
 
 // ── TABS config — action must match vembu's SP action names exactly ───────────
 const TABS = [
+  { id: '3', label: 'Invited',       action: 'InvitedGoalPlans'     },
+  { id: '2', label: 'Nested Plans',  action: 'MyAssignedGoals'      },
   { id: '1', label: 'Goal Plans',    action: 'AllPlans'             },
-  { id: '2', label: 'Assigned',      action: 'InvitedGoalPlans'     },
   { id: '4', label: 'Completed',     action: 'MyCompletedGoalPlans' },
   { id: '5', label: 'Deleted Plans', action: 'DeleteGoalPlan'       },
 ];
@@ -279,7 +280,7 @@ export default function Dashboard() {
   const entityId   = user?.entityId;
   const companyId  = user?.companyId;
 
-  const [activeTab,  setActiveTab]  = useState('1');
+  const [activeTab, setActiveTab] = useState('3');  // Default to 'Invited' tab
   const [showModal,  setShowModal]  = useState(false);
   const [search,     setSearch]     = useState('');
 

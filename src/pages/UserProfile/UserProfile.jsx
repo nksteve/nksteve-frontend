@@ -8,8 +8,8 @@ import * as api from '../../api/client';
 import useAuthStore from '../../store/authStore';
 
 const C = {
-  primary: '#4F46E5',
-  primaryLight: '#EEF2FF',
+  primary: '#0197cc',
+  primaryLight: '#e6f7fd',
   success: '#10B981',
   warning: '#F59E0B',
   surface: '#FFFFFF',
@@ -42,6 +42,16 @@ export default function UserProfile() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('bio');
 
+  // Fetch user's name from entity setup
+  const { data: setupData } = useQuery({
+    queryKey: ['entitySetup', entityId],
+    queryFn: () => api.getEntitySetup(entityId),
+    enabled: !!entityId,
+    select: r => r.data?.entity || {},
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+
   return (
     <div style={{ padding: 32, maxWidth: 900, margin: '0 auto' }}>
       {/* Header */}
@@ -59,8 +69,12 @@ export default function UserProfile() {
           <User size={32} color="#fff" />
         </div>
         <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: C.text }}>{user?.email || 'User Profile'}</h1>
-          <p style={{ margin: '4px 0 0', color: C.text2, fontSize: 14 }}>Entity ID: {entityId}</p>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: C.text }}>
+            {setupData?.firstName && setupData?.lastName
+              ? `${setupData.firstName} ${setupData.lastName}`
+              : (user?.email ? user.email.split('@')[0] : 'User Profile')}
+          </h1>
+          <p style={{ margin: '4px 0 0', color: C.text2, fontSize: 14 }}>{user?.email || ''}</p>
         </div>
       </div>
 

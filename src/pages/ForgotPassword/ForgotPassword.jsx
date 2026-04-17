@@ -6,7 +6,7 @@ import { Mail, ArrowLeft, KeyRound } from 'lucide-react';
 import * as api from '../../api/client';
 
 const C = {
-  primary: '#4F46E5',
+  primary: '#0197cc',
   surface: '#FFFFFF',
   text: '#0F172A',
   text2: '#64748B',
@@ -59,7 +59,7 @@ export default function ForgotPassword() {
             width: 56,
             height: 56,
             borderRadius: 14,
-            background: '#EEF2FF',
+            background: '#e6f7fd',
             marginBottom: 16,
           }}>
             <KeyRound size={28} color={C.primary} />
