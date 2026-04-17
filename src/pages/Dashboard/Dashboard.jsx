@@ -297,14 +297,21 @@ export default function Dashboard() {
   });
 
   // ── Update VMV mutation ───────────────────────────────────────────────────
+  // VMV fields (vission/mission/value) live in entity_interests table,
+  // updated via updateEntityInterestsTag SP with action='ADD'
   const vmvMutation = useMutation({
-    mutationFn: (data) => api.updateEntityPersonal(data),
+    mutationFn: (data) => api.updateEntityInterests(data),
     onSuccess: () => { qc.invalidateQueries(['entitySetup', entityId]); toast.success('Saved!'); },
     onError: () => toast.error('Failed to save'),
   });
 
   const handleVMVSave = (field, value) => {
-    vmvMutation.mutate({ entityId, [field]: value });
+    vmvMutation.mutate({
+      action: 'ADD',
+      entityId,
+      tagId: null,
+      [field]: value,
+    });
   };
 
   // ── Filter plans by tab ───────────────────────────────────────────────────
