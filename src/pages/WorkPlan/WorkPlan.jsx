@@ -246,8 +246,8 @@ function DecisionIcon({ color, active }) {
 }
 
 /* ─── Yellow square dot (vembu uses a yellow square, not circle) ─────────────── */
-function YellowDot({ style }) {
-  return <div style={{ width: 12, height: 12, background: '#ffc107', borderRadius: 2, flexShrink: 0, ...style }} />;
+function YellowDot() {
+  return <div style={{ width: 12, height: 12, background: '#ffc107', borderRadius: 2, flexShrink: 0 }} />;
 }
 
 /* ─── Goal header row — purple band matching vembu ─────────────────────────── */
@@ -297,7 +297,7 @@ function GoalRow({ goal, goalActions, onChartClick, onDecisionClick, onNoteClick
         </div>
       </td>
 
-      {/* Bar chart + decision icons */}
+      {/* Bar chart + decision icons + yellow square if HeadsUp pending (matches vembu: icon column) */}
       <td style={{ padding: '0 4px', width: 64 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <button
@@ -314,6 +314,7 @@ function GoalRow({ goal, goalActions, onChartClick, onDecisionClick, onNoteClick
           >
             <DecisionIcon color="rgba(255,255,255,0.75)" />
           </button>
+          {hasHeadsUp && <YellowDot />}
         </div>
       </td>
 
@@ -326,10 +327,9 @@ function GoalRow({ goal, goalActions, onChartClick, onDecisionClick, onNoteClick
         />
       </td>
 
-      {/* % + yellow square on right if HeadsUp pending */}
-      <td style={{ padding: '0 6px', width: 60, textAlign: 'right', fontSize: 13, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', position: 'relative' }}>
+      {/* % cell — yellow square moved to icon column */}
+      <td style={{ padding: '0 6px', width: 60, textAlign: 'right', fontSize: 13, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>
         {pct.toFixed(1)}%
-        {hasHeadsUp && <YellowDot style={{ position: 'absolute', top: '50%', right: -2, transform: 'translateY(-50%)' }} />}
       </td>
 
       {/* Due date */}
@@ -385,8 +385,8 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
         </div>
       </td>
 
-      {/* Bar chart + decision icons — clickable, matches vembu */}
-      <td style={{ padding: '0 4px', width: 64 }}>
+      {/* Bar chart + decision icons — with yellow square if HeadsUp pending (matches vembu: icon column) */}
+      <td style={{ padding: '0 4px', width: 64, position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <button
             onClick={onChartClick}
@@ -406,6 +406,7 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
           >
             <DecisionIcon color="currentColor" />
           </button>
+          {hasHeadsUp && <YellowDot />}
         </div>
       </td>
 
@@ -421,10 +422,9 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
         />
       </td>
 
-      {/* % + yellow square on right if HeadsUp pending */}
-      <td style={{ padding: '0 6px', width: 60, textAlign: 'right', fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', position: 'relative' }}>
+      {/* % cell — no yellow square here (moved to icon column) */}
+      <td style={{ padding: '0 6px', width: 60, textAlign: 'right', fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap' }}>
         {localPct.toFixed(1)}%
-        {hasHeadsUp && <YellowDot style={{ position: 'absolute', top: '50%', right: -2, transform: 'translateY(-50%)' }} />}
       </td>
 
       {/* Due date — date text if set, FA-style calendar icon if not (matches vembu) */}
