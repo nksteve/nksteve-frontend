@@ -260,7 +260,7 @@ function GoalRow({ goal, goalActions, onChartClick, onDecisionClick, onNoteClick
   const pct = Math.min(100, aggPct);
   const milestoneDate = goal.goalMilestoneDate || goal.milestoneDate;
   const bgcolor = C.purple; // vembu always uses purple for goal rows
-  const hasHeadsUp = goal.goalFeedbackStatus === 0;
+  const hasHeadsUp = goal.goalFeedbackStatus !== 1;
 
   return (
     <tr style={{ background: bgcolor, height: 34 }}>
@@ -350,7 +350,7 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
   const [localPct, setLocalPct] = useState(pct);
   const endDate    = action.endDate || action.milestoneDate;
   const planColor  = themeColor || C.teal;
-  const hasHeadsUp = action.actionFeedbackStatus === 0;
+  const hasHeadsUp = action.actionFeedbackStatus !== 1;
 
   return (
     <tr style={{ background: '#fff', borderBottom: `1px solid ${C.border}`, height: 32 }}>
