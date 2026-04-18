@@ -1,254 +1,903 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'react-toastify';
-import { Video, Plus, Clock, Calendar, X, Loader2, AlertCircle } from 'lucide-react';
-import * as api from '../../api/client';
-import useAuthStore from '../../store/authStore';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Loader2, Download, Video, SmilePlus, Frown, Calendar,
+  Clock, Tag, ChevronLeft, ChevronRight, X, Users,
+} from 'lucide-react';
+import { http } from '../../api/client';
 
+/* ─── Design tokens ─────────────────────────────────────────────────────── */
 const C = {
-  primary: '#0197cc',
+  primary:    '#0197cc',
   primaryLight: '#e6f7fd',
-  success: '#10B981',
-  warning: '#F59E0B',
-  surface: '#FFFFFF',
-  bg: '#F8FAFC',
-  border: '#E2E8F0',
-  text: '#0F172A',
-  text2: '#64748B',
+  purple:     '#6B3FA0',
+  teal:       '#00b4d8',
+  tealLight:  '#e0f7fb',
+  success:    '#00e15a',
+  warning:    '#ffa500',
+  bg:         '#f4f5fa',
+  surface:    '#FFFFFF',
+  border:     '#e4e7ea',
+  text:       '#23282c',
+  text2:      '#73818f',
+  danger:     '#dc3545',
 };
 
-function StatusBadge({ status }) {
-  const map = {
-    Scheduled: { bg: '#e6f7fd', color: '#0197cc' },
-    Completed: { bg: '#ECFDF5', color: '#065F46' },
-    Cancelled: { bg: '#FEF2F2', color: '#991B1B' },
-    default: { bg: '#F1F5F9', color: '#475569' },
-  };
-  const s = map[status] || map.default;
-  return <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: s.bg, color: s.color }}>{status || 'Scheduled'}</span>;
+const font = "'Source Sans 3', 'Source Sans Pro', sans-serif";
+
+/* ─── Helpers ───────────────────────────────────────────────────────────── */
+function getUser() {
+  try { return JSON.parse(localStorage.getItem('onup_user')) || {}; }
+  catch { return {}; }
 }
 
+/**
+ * Parse a date string and apply a UTC+0 offset (no shifting).
+ * Mirrors: moment(str).utcOffset(0)
+ */
+function parseUTC(str) {
+  if (!str) return null;
+  // If already has timezone info, just parse it
+  const d = new Date(str);
+  if (isNaN(d)) return null;
+  return d;
+}
+
+function fmtDate(d) {
+  if (!d) return '';
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return `${days[d.getUTCDay()]}, ${months[d.getUTCMonth()]} ${String(d.getUTCDate()).padStart(2,'0')}, ${d.getUTCFullYear()}`;
+}
+
+function fmtTime(d) {
+  if (!d) return '';
+  let h = d.getUTCHours(), m = d.getUTCMinutes();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+
+/* ─── Spinner ───────────────────────────────────────────────────────────── */
 function Spinner() {
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
-      <Loader2 size={32} color={C.primary} style={{ animation: 'spin 1s linear infinite' }} />
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+    <div style={{ display:'flex', justifyContent:'center', padding:60 }}>
+      <Loader2
+        size={34}
+        color={C.primary}
+        style={{ animation:'spin 1s linear infinite' }}
+      />
+      <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }
 
-export default function Meetings() {
-  const { user } = useAuthStore();
-  const entityId = user?.entityId;
-  const companyId = user?.companyId;
-  const queryClient = useQueryClient();
-  const [tab, setTab] = useState('upcoming');
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({
-    meetingTitle: '', meetingDate: '', meetingTime: '', growthPlanId: '', description: '',
-  });
+/* ─── Empty state ───────────────────────────────────────────────────────── */
+function Empty() {
+  return (
+    <div style={{
+      textAlign:'center', padding:'56px 24px',
+      color:C.text2, fontFamily:font,
+    }}>
+      <Video size={44} color="#CBD5E1" style={{ marginBottom:12 }} />
+      <p style={{ margin:0, fontSize:15 }}>No meetings have been scheduled yet.</p>
+    </div>
+  );
+}
 
-  const { data: meetings = [], isLoading, isError } = useQuery({
-    queryKey: ['meetings', entityId, companyId],
-    queryFn: () => api.getMeetings({ entityId, companyId }),
-    select: (res) => res.data?.meetings || res.data?.result || [],
-    enabled: !!entityId,
-  });
+/* ─── ConfirmModal ──────────────────────────────────────────────────────── */
+function ConfirmModal({ title, bodyHtml, cancelLabel, confirmLabel, onCancel, onConfirm }) {
+  return (
+    <div style={{
+      position:'fixed', inset:0,
+      background:'rgba(0,0,0,0.48)',
+      zIndex:2000,
+      display:'flex', alignItems:'center', justifyContent:'center',
+      fontFamily:font,
+    }}>
+      <div style={{
+        background:'#fff', borderRadius:10,
+        padding:'28px 32px', width:460,
+        boxShadow:'0 12px 40px rgba(0,0,0,0.22)',
+      }}>
+        <h3 style={{ margin:'0 0 14px', fontSize:17, fontWeight:700, color:C.text }}>{title}</h3>
+        <div
+          style={{ margin:'0 0 24px', fontSize:14, color:C.text2, lineHeight:1.5 }}
+          dangerouslySetInnerHTML={{ __html: bodyHtml }}
+        />
+        <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+          <button
+            onClick={onCancel}
+            style={{
+              padding:'9px 20px',
+              background:'#fff',
+              color:C.text,
+              border:`1px solid ${C.border}`,
+              borderRadius:6,
+              cursor:'pointer',
+              fontWeight:600,
+              fontSize:14,
+              fontFamily:font,
+            }}
+          >{cancelLabel}</button>
+          <button
+            onClick={onConfirm}
+            style={{
+              padding:'9px 20px',
+              background:C.danger,
+              color:'#fff',
+              border:'none',
+              borderRadius:6,
+              cursor:'pointer',
+              fontWeight:600,
+              fontSize:14,
+              fontFamily:font,
+            }}
+          >{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  const { data: plans = [] } = useQuery({
-    queryKey: ['myPlans', entityId],
-    queryFn: () => api.getGrowthPlanDetails({ action: 'MyGrowthPlans', entityId }),
-    select: (res) => res.data?.plans || res.data?.myPlans || [],
-    enabled: !!entityId,
-  });
+/* ─── JoinButton with countdown ─────────────────────────────────────────── */
+function JoinButton({ meeting, onJoin }) {
+  const { actorId, scheduledGC, scheduledMM, showJoinButton } = meeting;
+  const rawDate = actorId === 1 ? scheduledGC : scheduledMM;
+  const scheduledDate = parseUTC(rawDate);
 
-  const scheduleMutation = useMutation({
-    mutationFn: () => api.updateMeeting({
-      action: 'ADD',
-      entityId,
-      companyId,
-      meetingTitle: form.meetingTitle,
-      meetingDate: form.meetingDate && form.meetingTime ? `${form.meetingDate}T${form.meetingTime}` : form.meetingDate,
-      growthPlanId: form.growthPlanId || null,
-      description: form.description,
-    }),
-    onSuccess: () => {
-      toast.success('Meeting scheduled!');
-      queryClient.invalidateQueries(['meetings']);
-      setShowModal(false);
-      setForm({ meetingTitle: '', meetingDate: '', meetingTime: '', growthPlanId: '', description: '' });
-    },
-    onError: () => toast.error('Failed to schedule meeting'),
-  });
+  const calcBtnShow = useCallback(() => {
+    if (!scheduledDate) return 1;
+    const diff = scheduledDate.valueOf() - Date.now() - (showJoinButton || 0);
+    return diff <= 0 ? 1 : diff;
+  }, [scheduledDate, showJoinButton]);
 
-  const now = new Date();
-  const upcoming = meetings.filter(m => !m.meetingDate || new Date(m.meetingDate) >= now);
-  const past = meetings.filter(m => m.meetingDate && new Date(m.meetingDate) < now);
-  const displayed = tab === 'upcoming' ? upcoming : past;
+  const [ms, setMs] = useState(calcBtnShow);
+  const enabled = ms <= 1;
+
+  useEffect(() => {
+    if (enabled) return;
+    const id = setInterval(() => {
+      const next = calcBtnShow();
+      setMs(next);
+      if (next <= 1) clearInterval(id);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [calcBtnShow, enabled]);
+
+  const fmtCountdown = (msLeft) => {
+    const s = Math.floor(msLeft / 1000);
+    const days = Math.floor(s / 86400);
+    const hrs  = Math.floor((s % 86400) / 3600);
+    const mins = Math.floor((s % 3600) / 60);
+    const secs = s % 60;
+    if (days > 0) return `${days}d ${hrs}h ${mins}m`;
+    return `${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+  };
 
   return (
-    <div style={{ padding: 32, maxWidth: 1100, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: C.text }}>Meetings</h1>
-          <p style={{ margin: '4px 0 0', color: C.text2, fontSize: 14 }}>{meetings.length} total meetings</p>
+    <button
+      onClick={enabled ? onJoin : undefined}
+      disabled={!enabled}
+      title={!enabled ? `Available in ${fmtCountdown(ms)}` : 'Join Now'}
+      style={{
+        padding:'7px 18px',
+        background: enabled ? C.primary : '#a0c4d8',
+        color:'#fff',
+        border:'none',
+        borderRadius:6,
+        fontWeight:700,
+        fontSize:14,
+        fontFamily:font,
+        cursor: enabled ? 'pointer' : 'not-allowed',
+        whiteSpace:'nowrap',
+        transition:'background 0.2s',
+      }}
+    >
+      {enabled ? 'Join Now' : `Join in ${fmtCountdown(ms)}`}
+    </button>
+  );
+}
+
+/* ─── MeetingCard (upcoming) ────────────────────────────────────────────── */
+function MeetingCard({ meeting, onCancel, onReschedule }) {
+  const navigate = useNavigate();
+  const {
+    meetingId, growthPlanId, growthPlanName,
+    actorId, scheduledGC, scheduledMM, scheduledMinutes,
+    title, topic, matchList = [], colorCodeHex,
+    mentorFirstName, gpTimeZone, mentorTimeZone,
+    meetingType, teamMembers,
+  } = meeting;
+
+  const borderColor = actorId === 1
+    ? (colorCodeHex ? `#${colorCodeHex.replace(/^#/,'')}` : C.primary)
+    : C.teal;
+
+  const rawDate     = actorId === 1 ? scheduledGC : scheduledMM;
+  const scheduledDate = parseUTC(rawDate);
+  const mdate = scheduledDate ? fmtDate(scheduledDate) : '';
+  const mtime = scheduledDate ? fmtTime(scheduledDate) : '';
+
+  // matchList split by scope
+  const sharedInterests = (matchList || []).filter(i => i.scope === 'INTEREST' || i.scope === 'Interest');
+  const relevantSkills  = (matchList || []).filter(i => i.scope === 'SKILL'    || i.scope === 'Skill');
+
+  // teamMembers for community meetings (meetingType===3)
+  const members = teamMembers
+    ? teamMembers.split(',').map(s => s.trim()).filter(Boolean)
+    : [];
+
+  // ICS download
+  const handleDownload = () => {
+    if (!scheduledDate) return;
+    const dtStart = scheduledDate.toISOString().replace(/[-:]/g,'').split('.')[0]+'Z';
+    const dtEnd   = new Date(scheduledDate.valueOf() + (scheduledMinutes||60)*60000)
+      .toISOString().replace(/[-:]/g,'').split('.')[0]+'Z';
+    const ics = [
+      'BEGIN:VCALENDAR', 'VERSION:2.0',
+      'BEGIN:VEVENT',
+      `DTSTART:${dtStart}`,
+      `DTEND:${dtEnd}`,
+      `SUMMARY:${title || 'Meeting'}`,
+      `DESCRIPTION:${topic || ''}`,
+      'END:VEVENT', 'END:VCALENDAR',
+    ].join('\r\n');
+    const blob = new Blob([ics], { type:'text/calendar' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'meeting.ics'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleJoin = () => {
+    if (meetingType === 1) navigate('/meetnow');
+    else if (meetingType === 3) navigate('/communityMeetingPage');
+    else navigate('/chatsession');
+  };
+
+  return (
+    <div style={{
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderLeft: `8px solid ${borderColor}`,
+      borderRadius: 10,
+      marginBottom: 16,
+      boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+      overflow:'hidden',
+      fontFamily: font,
+    }}>
+      {/* Card header */}
+      <div style={{
+        display:'flex',
+        flexWrap:'wrap',
+        alignItems:'center',
+        justifyContent:'space-between',
+        gap:12,
+        padding:'14px 20px',
+        borderBottom:`1px solid ${C.border}`,
+        background:'#fafbfc',
+      }}>
+        <div style={{ display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:6, color:C.text, fontWeight:600, fontSize:14 }}>
+            <Calendar size={15} color={C.primary} />
+            {mdate}
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:6, color:C.text2, fontSize:13 }}>
+            <Clock size={14} />
+            {mtime}
+          </div>
+          {scheduledMinutes && (
+            <div style={{ fontSize:13, color:C.text2 }}>
+              {scheduledMinutes} minute session
+            </div>
+          )}
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: C.primary, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
-        >
-          <Plus size={16} /> Schedule Meeting
-        </button>
+        <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+          <button
+            onClick={handleDownload}
+            style={{
+              display:'flex', alignItems:'center', gap:5,
+              background:'none', border:'none', cursor:'pointer',
+              color:C.primary, fontSize:13, fontWeight:600, fontFamily:font,
+              padding:'4px 2px',
+            }}
+          >
+            <Download size={14} /> Download Appointment
+          </button>
+          <JoinButton meeting={meeting} onJoin={handleJoin} />
+          <button
+            onClick={() => onCancel(meeting)}
+            style={{
+              padding:'6px 14px',
+              background:'#fff',
+              color:C.danger,
+              border:`1px solid ${C.danger}`,
+              borderRadius:6,
+              fontWeight:600,
+              fontSize:13,
+              fontFamily:font,
+              cursor:'pointer',
+            }}
+          >Cancel</button>
+        </div>
+      </div>
+
+      {/* Card body */}
+      <div style={{ display:'flex', gap:0, flexWrap:'wrap' }}>
+        {/* Left col */}
+        <div style={{
+          flex:'1 1 260px',
+          padding:'18px 20px',
+          borderRight:`1px solid ${C.border}`,
+        }}>
+          {growthPlanName && (
+            <div style={{ marginBottom:14 }}>
+              <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:C.text2, marginBottom:4, letterSpacing:'0.06em' }}>
+                Growth Plan
+              </div>
+              <a
+                href={`/growth-plan/${growthPlanId}`}
+                style={{ color:C.primary, fontWeight:700, fontSize:15, textDecoration:'none' }}
+              >{growthPlanName}</a>
+            </div>
+          )}
+          {topic && (
+            <div>
+              <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:C.text2, marginBottom:6, letterSpacing:'0.06em' }}>
+                Topic for Conversation
+              </div>
+              <div style={{ fontSize:14, color:C.text, lineHeight:1.6 }}>{topic}</div>
+            </div>
+          )}
+          {!topic && title && (
+            <div>
+              <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:C.text2, marginBottom:6, letterSpacing:'0.06em' }}>
+                Meeting
+              </div>
+              <div style={{ fontSize:14, color:C.text, fontWeight:600 }}>{title}</div>
+            </div>
+          )}
+        </div>
+
+        {/* Right col */}
+        <div style={{
+          flex:'1 1 260px',
+          padding:'18px 20px',
+        }}>
+          {mentorFirstName && (
+            <div style={{ marginBottom:14 }}>
+              <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:C.text2, marginBottom:8, letterSpacing:'0.06em' }}>
+                About Your Growth Champion
+              </div>
+              <div style={{ fontWeight:700, fontSize:15, color:C.text, marginBottom:10 }}>
+                {mentorFirstName}
+              </div>
+            </div>
+          )}
+
+          {sharedInterests.length > 0 && (
+            <div style={{ marginBottom:12 }}>
+              <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:C.text2, marginBottom:6, letterSpacing:'0.06em' }}>
+                Shared Interest
+              </div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                {sharedInterests.map((item, i) => (
+                  <span key={i} style={{
+                    padding:'3px 10px',
+                    background:C.primaryLight,
+                    color:C.primary,
+                    borderRadius:20,
+                    fontSize:12,
+                    fontWeight:600,
+                  }}>{item.tag}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {relevantSkills.length > 0 && (
+            <div style={{ marginBottom:12 }}>
+              <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:C.text2, marginBottom:6, letterSpacing:'0.06em' }}>
+                Relevant Skills
+              </div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                {relevantSkills.map((item, i) => (
+                  <span key={i} style={{
+                    padding:'3px 10px',
+                    background:C.tealLight,
+                    color:C.teal,
+                    borderRadius:20,
+                    fontSize:12,
+                    fontWeight:600,
+                  }}>{item.tag}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Team members for community meetings */}
+          {meetingType === 3 && members.length > 0 && (
+            <div>
+              <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:C.text2, marginBottom:6, letterSpacing:'0.06em', display:'flex', alignItems:'center', gap:4 }}>
+                <Users size={12} /> Team Members
+              </div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                {members.map((name, i) => (
+                  <span key={i} style={{
+                    padding:'3px 10px',
+                    background:C.tealLight,
+                    color:C.teal,
+                    borderRadius:20,
+                    fontSize:12,
+                    fontWeight:600,
+                  }}>{name}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── PastMeetingCard ───────────────────────────────────────────────────── */
+function PastMeetingCard({ meeting, entityId }) {
+  const {
+    meetingId, title, topic, actorId,
+    scheduledGC, scheduledMM, scheduledMinutes,
+    growthPlanName, growthPlanId,
+    entityMentorId, mentorFirstName,
+    gcFeedbakList = [],
+  } = meeting;
+
+  // Determine actorId: entityMentorId === entityId → actorId=2, else actorId=1
+  const resolvedActorId = entityMentorId === entityId ? 2 : 1;
+  const rawDate = resolvedActorId === 1 ? scheduledGC : scheduledMM;
+  const scheduledDate = parseUTC(rawDate);
+  const mdate = scheduledDate ? fmtDate(scheduledDate) : '';
+  const mtime = scheduledDate ? fmtTime(scheduledDate) : '';
+
+  const borderColor = resolvedActorId === 1 ? C.primary : C.teal;
+
+  // Match current user's feedback
+  const myFeedback    = gcFeedbakList.find(f => f.feedbackActorId === entityId);
+  const otherFeedback = gcFeedbakList.find(f => f.feedbackActorId !== entityId);
+
+  const otherName = mentorFirstName || 'your match';
+  const howDidItGo = myFeedback?.howDidItGo;
+
+  return (
+    <div style={{
+      background:C.surface,
+      border:`1px solid ${C.border}`,
+      borderLeft:`8px solid ${borderColor}`,
+      borderRadius:10,
+      marginBottom:16,
+      boxShadow:'0 2px 8px rgba(0,0,0,0.05)',
+      overflow:'hidden',
+      fontFamily:font,
+    }}>
+      {/* Header */}
+      <div style={{
+        display:'flex', flexWrap:'wrap', alignItems:'center',
+        justifyContent:'space-between', gap:12,
+        padding:'14px 20px',
+        borderBottom:`1px solid ${C.border}`,
+        background:'#fafbfc',
+      }}>
+        <div style={{ display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' }}>
+          <div style={{ fontWeight:700, fontSize:15, color:C.text }}>{title || 'Meeting'}</div>
+          <div style={{ display:'flex', alignItems:'center', gap:6, color:C.text2, fontSize:13 }}>
+            <Calendar size={14} color={C.primary} />
+            {mdate}
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:5, color:C.text2, fontSize:13 }}>
+            <Clock size={13} /> {mtime}
+          </div>
+        </div>
+        <div style={{ fontSize:13, color:C.text2, fontStyle:'italic' }}>Completed</div>
+      </div>
+
+      {/* Body */}
+      <div style={{ padding:'18px 20px' }}>
+        <div style={{ fontSize:14, color:C.text2, marginBottom:14 }}>
+          You met with <span style={{ fontWeight:700, color:C.text }}>{otherName}</span>
+        </div>
+
+        {/* How did it go */}
+        {howDidItGo && (
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+            <span style={{ fontSize:13, fontWeight:600, color:C.text2 }}>How did it go?</span>
+            {howDidItGo === 'Good'
+              ? <SmilePlus size={22} color={C.success} />
+              : <Frown size={22} color={C.danger} />
+            }
+            <span style={{
+              fontSize:13, fontWeight:700,
+              color: howDidItGo === 'Good' ? C.success : C.danger,
+            }}>{howDidItGo}</span>
+          </div>
+        )}
+
+        {/* Topics covered */}
+        {topic && (
+          <div style={{ marginBottom:14 }}>
+            <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:C.text2, marginBottom:5, letterSpacing:'0.06em' }}>
+              Topics Covered
+            </div>
+            <div style={{ fontSize:14, color:C.text, lineHeight:1.6 }}>{topic}</div>
+          </div>
+        )}
+
+        {/* Meeting feedback */}
+        {myFeedback && (
+          <div style={{
+            background:C.bg,
+            border:`1px solid ${C.border}`,
+            borderRadius:8,
+            padding:'14px 16px',
+            marginBottom:12,
+          }}>
+            <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:10 }}>Meeting Feedback</div>
+
+            {/* My Notes */}
+            {myFeedback.improvementSuggestions && (
+              <div style={{ marginBottom:10 }}>
+                <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:C.text2, marginBottom:4, letterSpacing:'0.06em' }}>
+                  My Notes
+                </div>
+                <div style={{ fontSize:13, color:C.text, lineHeight:1.5 }}>
+                  {myFeedback.improvementSuggestions}
+                </div>
+              </div>
+            )}
+
+            {/* Other person's notes */}
+            {otherFeedback?.improvementSuggestions && (
+              <div style={{ marginBottom:10 }}>
+                <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:C.text2, marginBottom:4, letterSpacing:'0.06em' }}>
+                  {otherName}'s Notes
+                </div>
+                <div style={{ fontSize:13, color:C.text, lineHeight:1.5 }}>
+                  {otherFeedback.improvementSuggestions}
+                </div>
+              </div>
+            )}
+
+            {/* Feedback tags */}
+            {myFeedback.feedbackTags && myFeedback.feedbackTags.length > 0 && (
+              <div style={{ marginTop:8 }}>
+                <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:C.text2, marginBottom:6, letterSpacing:'0.06em' }}>
+                  Feedback Tags
+                </div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                  {(Array.isArray(myFeedback.feedbackTags)
+                    ? myFeedback.feedbackTags
+                    : myFeedback.feedbackTags.split(',').map(s=>s.trim()).filter(Boolean)
+                  ).map((tag, i) => (
+                    <span key={i} style={{
+                      padding:'3px 10px',
+                      background:'#fff4e5',
+                      color:C.warning,
+                      border:`1px solid ${C.warning}`,
+                      borderRadius:20,
+                      fontSize:12,
+                      fontWeight:600,
+                      display:'flex', alignItems:'center', gap:4,
+                    }}>
+                      <Tag size={10} /> {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Private/Public Notes */}
+        {myFeedback?.privateNotes && (
+          <div style={{ marginBottom:10 }}>
+            <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:C.text2, marginBottom:4, letterSpacing:'0.06em' }}>
+              Private Notes
+            </div>
+            <div style={{ fontSize:13, color:C.text, lineHeight:1.5 }}>{myFeedback.privateNotes}</div>
+          </div>
+        )}
+        {myFeedback?.publicNotes && (
+          <div>
+            <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', color:C.text2, marginBottom:4, letterSpacing:'0.06em' }}>
+              Public Notes
+            </div>
+            <div style={{ fontSize:13, color:C.text, lineHeight:1.5 }}>{myFeedback.publicNotes}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── CalendarView ──────────────────────────────────────────────────────── */
+function CalendarView({ entityId }) {
+  const [scope, setScope]     = useState('DATE');   // 'DATE' | 'WEEK' | 'MONTH'
+  const [buckets, setBuckets] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async (s) => {
+    setLoading(true);
+    try {
+      const res = await http.post('/getMeetingsCalendar', {
+        entityId, startDate: null, bucketScope: s,
+      });
+      const raw = res.data?.buckets || res.data?.calendar || res.data?.meetings || (Array.isArray(res.data) ? res.data : []);
+      setBuckets(Array.isArray(raw) ? raw : []);
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }, [entityId]);
+
+  useEffect(() => { load(scope); }, [scope, load]);
+
+  const scopeLabels = { DATE:'Day', WEEK:'Week', MONTH:'Month' };
+
+  return (
+    <div style={{ fontFamily:font }}>
+      {/* Toggle */}
+      <div style={{
+        display:'flex', gap:0, marginBottom:20,
+        border:`1px solid ${C.border}`, borderRadius:7,
+        overflow:'hidden', width:'fit-content',
+      }}>
+        {Object.entries(scopeLabels).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setScope(key)}
+            style={{
+              padding:'8px 22px',
+              border:'none',
+              borderRight: key !== 'MONTH' ? `1px solid ${C.border}` : 'none',
+              background: scope === key ? C.primary : '#fff',
+              color: scope === key ? '#fff' : C.text2,
+              fontWeight: scope === key ? 700 : 400,
+              fontSize:14,
+              fontFamily:font,
+              cursor:'pointer',
+              transition:'background 0.15s',
+            }}
+          >{label}</button>
+        ))}
+      </div>
+
+      {loading && <Spinner />}
+
+      {!loading && buckets.length === 0 && (
+        <div style={{ textAlign:'center', padding:'48px 24px', color:C.text2, fontSize:15 }}>
+          No meetings found for this {scopeLabels[scope].toLowerCase()}.
+        </div>
+      )}
+
+      {!loading && buckets.map((bucket, bi) => {
+        const meetings = bucket.meetings || bucket.meetingList || [];
+        return (
+          <div key={bi} style={{ marginBottom:20 }}>
+            {/* Date header */}
+            <div style={{
+              fontWeight:700,
+              fontSize:15,
+              color:C.text,
+              padding:'10px 16px',
+              background:C.bg,
+              border:`1px solid ${C.border}`,
+              borderRadius:'8px 8px 0 0',
+              borderBottom:'none',
+            }}>
+              {bucket.bucketLabel || bucket.date || bucket.dateRange || `Period ${bi+1}`}
+            </div>
+
+            <div style={{
+              border:`1px solid ${C.border}`,
+              borderRadius:'0 0 8px 8px',
+              overflow:'hidden',
+            }}>
+              {meetings.length === 0 && (
+                <div style={{ padding:'14px 18px', color:C.text2, fontSize:13 }}>
+                  No meetings
+                </div>
+              )}
+              {meetings.map((m, mi) => {
+                const rawDate = m.actorId === 1 ? m.scheduledGC : m.scheduledMM;
+                const sd = parseUTC(rawDate);
+                return (
+                  <div
+                    key={mi}
+                    style={{
+                      display:'flex',
+                      alignItems:'flex-start',
+                      gap:16,
+                      padding:'12px 18px',
+                      borderBottom: mi < meetings.length - 1 ? `1px solid ${C.border}` : 'none',
+                      background:'#fff',
+                    }}
+                  >
+                    <div style={{ width:70, flexShrink:0, fontSize:13, fontWeight:600, color:C.primary }}>
+                      {sd ? fmtTime(sd) : '—'}
+                    </div>
+                    <div>
+                      <div style={{ fontSize:14, fontWeight:700, color:C.text, marginBottom:2 }}>
+                        {m.title || m.growthPlanName || 'Meeting'}
+                      </div>
+                      {m.topic && (
+                        <div style={{ fontSize:13, color:C.text2 }}>{m.topic}</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─── Tabs ──────────────────────────────────────────────────────────────── */
+const TABS = [
+  { id:'upcoming', label:'Upcoming' },
+  { id:'past',     label:'Past' },
+  { id:'calendar', label:'Calendar' },
+];
+
+/* ─── Main Meetings page ─────────────────────────────────────────────────── */
+export default function Meetings() {
+  const user      = getUser();
+  const entityId  = user?.entityId;
+
+  const [tab, setTab]                   = useState('upcoming');
+  const [upcoming, setUpcoming]         = useState([]);
+  const [past, setPast]                 = useState([]);
+  const [loadingUpcoming, setLoadingUpcoming] = useState(false);
+  const [loadingPast, setLoadingPast]   = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(null);   // meeting obj
+  const [actionLoading, setActionLoading] = useState(false);
+
+  /* ── Load upcoming ── */
+  const fetchUpcoming = useCallback(async () => {
+    if (!entityId) return;
+    setLoadingUpcoming(true);
+    try {
+      const res = await http.post('/getMeetings', { action:'PENDING', entityId });
+      setUpcoming(res.data?.meeting || res.data?.meetings || res.data?.result || []);
+    } catch { /* ignore */ }
+    finally { setLoadingUpcoming(false); }
+  }, [entityId]);
+
+  /* ── Load past ── */
+  const fetchPast = useCallback(async () => {
+    if (!entityId) return;
+    setLoadingPast(true);
+    try {
+      const res = await http.post('/getMeetings', { action:'COMPLETE', entityId });
+      setPast(res.data?.meeting || res.data?.meetings || res.data?.result || []);
+    } catch { /* ignore */ }
+    finally { setLoadingPast(false); }
+  }, [entityId]);
+
+  useEffect(() => {
+    if (tab === 'upcoming') fetchUpcoming();
+    if (tab === 'past')     fetchPast();
+  }, [tab, fetchUpcoming, fetchPast]);
+
+  /* ── Cancel ── */
+  const handleCancelConfirm = async () => {
+    if (!confirmCancel) return;
+    setActionLoading(true);
+    try {
+      await http.post('/updateMeeting', {
+        action:'CANCEL',
+        meeting:{ meetingId: confirmCancel.meetingId, statusId: 5 },
+      });
+      setConfirmCancel(null);
+      fetchUpcoming();
+    } catch { /* ignore */ }
+    finally { setActionLoading(false); }
+  };
+
+  /* ── Reschedule ── (no modal shown per spec, direct API call on a reschedule trigger)
+     The spec only mentions a Cancel button on upcoming cards; reschedule not in the
+     card UI per spec, so it is wired but not shown as a separate button to keep the
+     layout matching Vembu.                                                          */
+
+  const isLoadingTab = tab === 'upcoming' ? loadingUpcoming : tab === 'past' ? loadingPast : false;
+  const tabList      = tab === 'upcoming' ? upcoming : tab === 'past' ? past : [];
+
+  return (
+    <div style={{
+      padding:'28px 28px 60px',
+      maxWidth:1100,
+      margin:'0 auto',
+      background:C.bg,
+      minHeight:'100vh',
+      fontFamily:font,
+      boxSizing:'border-box',
+    }}>
+      {/* Page header */}
+      <div style={{ marginBottom:24 }}>
+        <h1 style={{ margin:0, fontSize:24, fontWeight:700, color:C.text }}>Meetings</h1>
+        <p style={{ margin:'4px 0 0', color:C.text2, fontSize:14 }}>
+          View and manage your scheduled sessions
+        </p>
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${C.border}`, marginBottom: 24 }}>
-        {[
-          { id: 'upcoming', label: `Upcoming (${upcoming.length})` },
-          { id: 'past', label: `Past (${past.length})` },
-        ].map(t => (
+      <div style={{
+        display:'flex', gap:0,
+        borderBottom:`2px solid ${C.border}`,
+        marginBottom:24,
+      }}>
+        {TABS.map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             style={{
-              padding: '10px 20px', border: 'none', background: 'transparent', cursor: 'pointer',
-              fontSize: 14, fontWeight: tab === t.id ? 600 : 400,
+              padding:'10px 24px',
+              border:'none',
+              background:'transparent',
+              cursor:'pointer',
+              fontSize:14,
+              fontWeight: tab === t.id ? 700 : 400,
               color: tab === t.id ? C.primary : C.text2,
-              borderBottom: tab === t.id ? `2px solid ${C.primary}` : '2px solid transparent',
-              marginBottom: -1,
+              borderBottom: tab === t.id ? `3px solid ${C.primary}` : '3px solid transparent',
+              marginBottom:-2,
+              fontFamily:font,
+              transition:'color 0.15s',
             }}
-          >
-            {t.label}
-          </button>
+          >{t.label}</button>
         ))}
       </div>
 
-      {isLoading && <Spinner />}
-      {isError && (
-        <div style={{ display: 'flex', gap: 8, color: '#EF4444', padding: 16, background: '#FEF2F2', borderRadius: 8, alignItems: 'center' }}>
-          <AlertCircle size={16} /> Failed to load meetings.
-        </div>
+      {/* Content */}
+      {tab === 'calendar' && (
+        <CalendarView entityId={entityId} />
       )}
 
-      {!isLoading && !isError && (
-        displayed.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 24px', color: C.text2 }}>
-            <Video size={40} style={{ color: '#CBD5E1', marginBottom: 12 }} />
-            <p style={{ margin: 0 }}>No {tab} meetings found.</p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {displayed.map((m, i) => (
-              <div key={i} style={{
-                background: C.surface,
-                border: `1px solid ${C.border}`,
-                borderRadius: 12,
-                padding: '18px 22px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                transition: 'box-shadow 0.15s',
-              }}
-                onMouseEnter={e => e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.08)'}
-                onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
-              >
-                <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 10, background: C.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Video size={20} color={C.primary} />
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 15, color: C.text }}>{m.meetingTitle || m.title}</div>
-                    <div style={{ display: 'flex', gap: 14, marginTop: 4 }}>
-                      {m.meetingDate && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: C.text2 }}>
-                          <Calendar size={12} />
-                          {new Date(m.meetingDate).toLocaleDateString()}
-                        </div>
-                      )}
-                      {m.meetingDate && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: C.text2 }}>
-                          <Clock size={12} />
-                          {new Date(m.meetingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                      )}
-                      {m.growthPlanName && (
-                        <span style={{ fontSize: 12, color: C.primary, background: C.primaryLight, padding: '2px 8px', borderRadius: 10 }}>
-                          {m.growthPlanName}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <StatusBadge status={m.meetingStatus} />
-              </div>
-            ))}
-          </div>
-        )
-      )}
+      {tab !== 'calendar' && (
+        <>
+          {isLoadingTab && <Spinner />}
 
-      {/* Schedule Modal */}
-      {showModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
-          <div style={{ background: C.surface, borderRadius: 16, padding: 32, width: '100%', maxWidth: 500, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Schedule Meeting</h2>
-              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
-            </div>
-            {[
-              { key: 'meetingTitle', label: 'Title *', type: 'text', placeholder: 'e.g. Q1 Review' },
-              { key: 'meetingDate', label: 'Date', type: 'date' },
-              { key: 'meetingTime', label: 'Time', type: 'time' },
-            ].map(({ key, label, type, placeholder }) => (
-              <div key={key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>{label}</label>
-                <input
-                  type={type}
-                  value={form[key]}
-                  onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                  placeholder={placeholder}
-                  style={{ width: '100%', padding: '10px 12px', border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
-                  onFocus={e => e.target.style.borderColor = C.primary}
-                  onBlur={e => e.target.style.borderColor = C.border}
+          {!isLoadingTab && tabList.length === 0 && <Empty />}
+
+          {!isLoadingTab && tabList.length > 0 && tabList.map((meeting, i) => (
+            tab === 'upcoming'
+              ? (
+                <MeetingCard
+                  key={meeting.meetingId || i}
+                  meeting={meeting}
+                  onCancel={setConfirmCancel}
+                  onReschedule={() => {}} /* reschedule not surfaced in Vembu upcoming card */
                 />
-              </div>
-            ))}
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Growth Plan</label>
-              <select
-                value={form.growthPlanId}
-                onChange={e => setForm(f => ({ ...f, growthPlanId: e.target.value }))}
-                style={{ width: '100%', padding: '10px 12px', border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 14, outline: 'none', background: '#fff' }}
-              >
-                <option value="">No Plan</option>
-                {plans.map((p, i) => (
-                  <option key={i} value={p.growthPlanId}>{p.growthPlanName}</option>
-                ))}
-              </select>
-            </div>
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Description</label>
-              <textarea
-                value={form.description}
-                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                placeholder="Meeting agenda or notes…"
-                rows={3}
-                style={{ width: '100%', padding: '10px 12px', border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 14, outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
-                onFocus={e => e.target.style.borderColor = C.primary}
-                onBlur={e => e.target.style.borderColor = C.border}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button onClick={() => setShowModal(false)} style={{ flex: 1, padding: 11, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 14 }}>Cancel</button>
-              <button
-                onClick={() => scheduleMutation.mutate()}
-                disabled={scheduleMutation.isPending || !form.meetingTitle}
-                style={{ flex: 1, padding: 11, background: C.primary, border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 14, color: '#fff', opacity: scheduleMutation.isPending ? 0.7 : 1 }}
-              >
-                {scheduleMutation.isPending ? 'Scheduling…' : 'Schedule'}
-              </button>
-            </div>
-          </div>
-        </div>
+              )
+              : (
+                <PastMeetingCard
+                  key={meeting.meetingId || i}
+                  meeting={meeting}
+                  entityId={entityId}
+                />
+              )
+          ))}
+        </>
+      )}
+
+      {/* Cancel confirmation modal */}
+      {confirmCancel && (
+        <ConfirmModal
+          title="Cancel Meeting"
+          bodyHtml="Are you sure you want to cancel this meeting? Canceling this meeting will remove it from your calendar and cannot be undone."
+          cancelLabel="Keep this Meeting"
+          confirmLabel={actionLoading ? 'Canceling…' : 'Cancel Meeting'}
+          onCancel={() => setConfirmCancel(null)}
+          onConfirm={handleCancelConfirm}
+        />
       )}
     </div>
   );

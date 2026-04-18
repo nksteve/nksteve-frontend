@@ -232,13 +232,25 @@ function FolderIcon({ color = '#adb5bd' }) {
   );
 }
 
-/* ─── Notes/copy icon (fa-file-text-o style — second icon in vembu rows) ─────── */
-function NoteIcon({ color = '#adb5bd' }) {
+/* ─── Notes icon — fa-sticky-note-o (post-it with folded corner, exact vembu shape) */
+function NoteIcon({ color = '#adb5bd', hasNotes = false }) {
   return (
-    <svg viewBox="0 0 384 512" width={12} height={14} fill={color} style={{ flexShrink: 0 }}>
-      {/* Font Awesome fa-file-text-o (file with lines) */}
-      <path d="M224 136V0H24C10.7 0 0 10.7 0 24v464c0 13.3 10.7 24 24 24h336c13.3 0 24-10.7 24-24V160H248c-13.2 0-24-10.8-24-24zm64 236c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12v8zm0-64c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12v8zm0-72v8c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12zm96-114.1L286.1 32c-4.5-4.5-10.6-7-17-7H256v128h128v-13.1c0-6.3-2.5-12.4-7-16.9z"/>
-    </svg>
+    <div style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
+      <svg viewBox="0 0 448 512" width={14} height={14} fill={color}>
+        {/* Font Awesome fa-sticky-note-o — post-it shape */}
+        <path d="M400 0H48C21.5 0 0 21.5 0 48v416c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V48c0-26.5-21.5-48-48-48zm16 464c0 8.8-7.2 16-16 16H48c-8.8 0-16-7.2-16-16V48c0-8.8 7.2-16 16-16h352c8.8 0 16 7.2 16 16v416zM128 136c0-4.4 3.6-8 8-8h176c4.4 0 8 3.6 8 8v16c0 4.4-3.6 8-8 8H136c-4.4 0-8-3.6-8-8v-16zm0 64c0-4.4 3.6-8 8-8h176c4.4 0 8 3.6 8 8v16c0 4.4-3.6 8-8 8H136c-4.4 0-8-3.6-8-8v-16zm0 64c0-4.4 3.6-8 8-8h176c4.4 0 8 3.6 8 8v16c0 4.4-3.6 8-8 8H136c-4.4 0-8-3.6-8-8v-16z"/>
+      </svg>
+      {hasNotes && (
+        <span style={{
+          position: 'absolute', top: -4, left: -4,
+          fontSize: 9, fontWeight: 700, color: '#fff',
+          background: '#0197cc', borderRadius: 2,
+          width: 10, height: 10,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          lineHeight: 1,
+        }}>!</span>
+      )}
+    </div>
   );
 }
 
@@ -301,8 +313,7 @@ function GoalRow({ goal, goalActions, onChartClick, onNoteClick, onFileClick }) 
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 4 }}>
             <button onClick={onNoteClick} title="Notes" style={{ background:'none',border:'none',cursor:'pointer',padding:0,position:'relative',display:'flex' }}>
-              <NoteIcon color={goal.notesCount > 0 ? C.teal : '#adb5bd'} />
-              {goal.notesCount > 0 && <span style={{ position:'absolute',top:-4,right:-4,background:C.teal,color:'#fff',borderRadius:'50%',fontSize:8,width:12,height:12,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700 }}>{goal.notesCount}</span>}
+              <NoteIcon color={goal.notesCount > 0 ? C.teal : '#adb5bd'} hasNotes={goal.notesCount > 0} />
             </button>
             <button onClick={onFileClick} title="Files" style={{ background:'none',border:'none',cursor:'pointer',padding:0,position:'relative',display:'flex' }}>
               <FolderIcon color={goal.docsCount > 0 ? C.teal : '#adb5bd'} />
@@ -387,8 +398,7 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 4 }}>
             <button onClick={onNoteClick} title="Notes" style={{ background:'none',border:'none',cursor:'pointer',padding:0,position:'relative',display:'flex' }}>
-              <NoteIcon color={action.notesCount > 0 ? planColor : '#adb5bd'} />
-              {action.notesCount > 0 && <span style={{ position:'absolute',top:-4,right:-4,background:planColor,color:'#fff',borderRadius:'50%',fontSize:8,width:12,height:12,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700 }}>{action.notesCount}</span>}
+              <NoteIcon color={action.notesCount > 0 ? planColor : '#adb5bd'} hasNotes={action.notesCount > 0} />
             </button>
             <button onClick={onFileClick} title="Files" style={{ background:'none',border:'none',cursor:'pointer',padding:0,position:'relative',display:'flex' }}>
               <FolderIcon color={action.docsCount > 0 ? planColor : '#adb5bd'} />
@@ -1062,14 +1072,22 @@ export default function WorkPlan() {
   const queryClient    = useQueryClient();
 
   const planId = searchParams.get('planId');
-  const [showGoalModal, setShowGoalModal] = useState(false);
-  const [chartGoal,     setChartGoal]     = useState(null); // { goal, goalActions }
-  const [notesCtx,      setNotesCtx]      = useState(null); // { growthPlanId, goalTagId, actionTagId, planColor }
-  const [filesCtx,      setFilesCtx]      = useState(null); // { growthPlanId, goalTagId, actionTagId, planColor }
-  const [refreshKey,    setRefreshKey]    = useState(0);
-  const [hideComplete,  setHideComplete]  = useState(false);
-  const [sortBy,        setSortBy]        = useState(''); // '' | 'Goal' | 'DueDate' | 'Status'
-  const [filterOpen,    setFilterOpen]    = useState(false);
+  const [showGoalModal,    setShowGoalModal]    = useState(false);
+  const [chartGoal,        setChartGoal]        = useState(null); // { goal, goalActions }
+  const [notesCtx,         setNotesCtx]         = useState(null); // { growthPlanId, goalTagId, actionTagId, planColor }
+  const [filesCtx,         setFilesCtx]         = useState(null); // { growthPlanId, goalTagId, actionTagId, planColor }
+  const [refreshKey,       setRefreshKey]       = useState(0);
+  const [hideComplete,     setHideComplete]     = useState(false);
+  const [sortBy,           setSortBy]           = useState(''); // '' | 'Goal' | 'DueDate' | 'Status'
+  const [filterOpen,       setFilterOpen]       = useState(false);
+  // Toolbar modal states
+  const [showPlanNotes,    setShowPlanNotes]    = useState(false);  // Notes toolbar btn
+  const [showLinkModal,    setShowLinkModal]    = useState(false);  // Link btn
+  const [showPickerModal,  setShowPickerModal]  = useState(false);  // Palette/color picker
+  const [showContribModal, setShowContribModal] = useState(false);  // Users/contributors
+  const [showBarReport,    setShowBarReport]    = useState(false);  // Chart (bar) btn
+  const [showStackReport,  setShowStackReport]  = useState(false);  // Stack btn
+  const [showFireReport,   setShowFireReport]   = useState(false);  // Fire/trending btn
 
   /* ── queries ── */
   const plansQuery = useQuery({
@@ -1233,8 +1251,21 @@ export default function WorkPlan() {
             </h1>
             {/* Inline toolbar icons right after title — matches vembu */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginLeft: 6 }}>
-              {TOOLBAR_ICONS.map(({ title, svg }) => (
-                <button key={title} title={title}
+              {[
+                { title: 'Notes',   svg: TOOLBAR_ICONS[0].svg,  onClick: () => setShowPlanNotes(true) },
+                { title: 'Link',    svg: TOOLBAR_ICONS[1].svg,  onClick: () => setShowLinkModal(true) },
+                { title: 'Chart',   svg: TOOLBAR_ICONS[2].svg,  onClick: () => setShowBarReport(true) },
+                { title: 'Palette', svg: TOOLBAR_ICONS[3].svg,  onClick: () => setShowPickerModal(true) },
+                { title: 'Print',   svg: TOOLBAR_ICONS[4].svg,  onClick: async () => {
+                    try { await api.updateEntityActivity({ activity:'PRINT', entityId, growthPlanId: Number(planId), auditMessage: 'You took print of the growth plan' }); } catch(e){}
+                    window.print();
+                  }
+                },
+                { title: 'Stack',   svg: TOOLBAR_ICONS[5].svg,  onClick: () => setShowStackReport(true) },
+                { title: 'Fire',    svg: TOOLBAR_ICONS[6].svg,  onClick: () => setShowFireReport(true) },
+                { title: 'Users',   svg: TOOLBAR_ICONS[7].svg,  onClick: () => setShowContribModal(true) },
+              ].map(({ title, svg, onClick }) => (
+                <button key={title} title={title} onClick={onClick}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '3px 4px', borderRadius: 4, color: C.text2, display: 'flex' }}
                   onMouseEnter={e => e.currentTarget.style.background = '#f0f4f8'}
                   onMouseLeave={e => e.currentTarget.style.background = 'none'}
@@ -1461,6 +1492,438 @@ export default function WorkPlan() {
           onClose={() => setFilesCtx(null)}
         />
       )}
+
+      {/* ─── Plan-level Notes Modal (toolbar Notes btn) ─── */}
+      {showPlanNotes && (
+        <NotesModal
+          growthPlanId={Number(planId)}
+          goalTagId={null}
+          actionTagId={null}
+          planColor={themeColor}
+          onClose={() => setShowPlanNotes(false)}
+        />
+      )}
+
+      {/* ─── Link Endpoint Modal ─── */}
+      {showLinkModal && (
+        <LinkEndpointModal
+          planId={Number(planId)}
+          entityId={entityId}
+          companyId={companyId}
+          onClose={() => setShowLinkModal(false)}
+        />
+      )}
+
+      {/* ─── Bar Chart / Goal Plan Report Modal ─── */}
+      {showBarReport && (
+        <PlanReportModal
+          planId={Number(planId)}
+          entityId={entityId}
+          companyId={companyId}
+          themeColor={themeColor}
+          onClose={() => setShowBarReport(false)}
+        />
+      )}
+
+      {/* ─── Color Picker Modal (Palette toolbar btn) ─── */}
+      {showPickerModal && (
+        <ColorPickerModal
+          planId={Number(planId)}
+          entityId={entityId}
+          companyId={companyId}
+          currentColor={themeColor}
+          onClose={() => setShowPickerModal(false)}
+          onChanged={() => { setShowPickerModal(false); doRefresh(); }}
+        />
+      )}
+
+      {/* ─── Stack / All-User Productivity Modal ─── */}
+      {showStackReport && (
+        <OverallReportModal
+          planId={Number(planId)}
+          entityId={entityId}
+          companyId={companyId}
+          onClose={() => setShowStackReport(false)}
+        />
+      )}
+
+      {/* ─── Fire / Trending Report Modal ─── */}
+      {showFireReport && (
+        <TrendingReportModal
+          planId={Number(planId)}
+          entityId={entityId}
+          companyId={companyId}
+          onClose={() => setShowFireReport(false)}
+        />
+      )}
+
+      {/* ─── Invite Contributors Modal ─── */}
+      {showContribModal && (
+        <InviteContributorsModal
+          planId={Number(planId)}
+          entityId={entityId}
+          companyId={companyId}
+          onClose={() => setShowContribModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * TOOLBAR MODAL COMPONENTS
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/* ─── Color Picker Modal (Palette btn) ─── */
+function ColorPickerModal({ planId, entityId, companyId, currentColor, onClose, onChanged }) {
+  const [colors, setColors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(null);
+
+  useEffect(() => {
+    api.getPicklist({ picklistType: 'COLOR', entityId })
+      .then(r => setColors(r.data?.picklist || []))
+      .catch(() => setColors([])) 
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function selectColor(colorHex) {
+    setSaving(colorHex);
+    try {
+      await api.updateGrowthPlan({
+        action: 'UpdateGrowthPlan',
+        entityId, companyId,
+        growthPlanId: planId,
+        colorCodeHex: colorHex.replace('#',''),
+      });
+      toast.success('Color updated');
+      onChanged();
+    } catch(e) {
+      toast.error('Failed to update color');
+      setSaving(null);
+    }
+  }
+
+  // Fallback colors if getPicklist returns nothing
+  const FALLBACK_COLORS = ['0197cc','6B3FA0','e74c3c','e67e22','f1c40f','2ecc71','1abc9c','3498db','9b59b6','34495e','95a5a6','27ae60'];
+  const displayed = colors.length > 0 ? colors : FALLBACK_COLORS.map(c => ({ colorCodeHex: c }));
+
+  return (
+    <div style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center' }}>
+      <div style={{ background:'#fff',borderRadius:8,padding:24,width:360,boxShadow:'0 8px 32px rgba(0,0,0,0.2)' }}>
+        <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16 }}>
+          <h3 style={{ margin:0,fontSize:16,fontWeight:700 }}>Choose Plan Color</h3>
+          <button onClick={onClose} style={{ background:'none',border:'none',cursor:'pointer' }}><X size={18}/></button>
+        </div>
+        {loading ? <Spinner /> : (
+          <div style={{ display:'flex',flexWrap:'wrap',gap:10 }}>
+            {displayed.map((c,i) => {
+              const hex = c.colorCodeHex ? (c.colorCodeHex.startsWith('#') ? c.colorCodeHex : `#${c.colorCodeHex}`) : `#${c}`;
+              const isActive = hex.toLowerCase() === (currentColor || '').toLowerCase();
+              return (
+                <button key={i} onClick={() => selectColor(hex)}
+                  disabled={saving !== null}
+                  style={{
+                    width:40,height:40,borderRadius:6,background:hex,border:isActive?'3px solid #222':'2px solid transparent',
+                    cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'transform .1s',
+                    transform: saving===hex ? 'scale(0.9)':'scale(1)',
+                  }}
+                  title={hex}
+                >
+                  {isActive && <span style={{color:'#fff',fontSize:14,fontWeight:700}}>✓</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Link Endpoint Modal ─── */
+function LinkEndpointModal({ planId, entityId, companyId, onClose }) {
+  const [tab, setTab] = useState('measures');
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    api.getGrowthPlanDetails({ action: 'GetEndpoints', growthPlanId: planId, entityId, companyId })
+      .then(r => setItems(r.data?.endpoints || r.data?.result || []))
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  }, [tab]);
+
+  return (
+    <div style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center' }}>
+      <div style={{ background:'#fff',borderRadius:8,width:560,maxHeight:'80vh',display:'flex',flexDirection:'column',boxShadow:'0 8px 32px rgba(0,0,0,0.2)' }}>
+        <div style={{ padding:'16px 20px',borderBottom:'1px solid #e4e7ea',display:'flex',justifyContent:'space-between',alignItems:'center' }}>
+          <h3 style={{ margin:0,fontSize:16,fontWeight:700 }}>Link Endpoint</h3>
+          <button onClick={onClose} style={{ background:'none',border:'none',cursor:'pointer' }}><X size={18}/></button>
+        </div>
+        <div style={{ display:'flex',borderBottom:'1px solid #e4e7ea' }}>
+          {['measures','endpoints'].map(t => (
+            <button key={t} onClick={() => setTab(t)}
+              style={{ padding:'10px 20px',border:'none',background:'transparent',cursor:'pointer',fontWeight:tab===t?700:400,
+                color:tab===t?'#0197cc':'#73818f',borderBottom:tab===t?'2px solid #0197cc':'2px solid transparent',marginBottom:-1 }}
+            >{t.charAt(0).toUpperCase()+t.slice(1)}</button>
+          ))}
+        </div>
+        <div style={{ flex:1,overflowY:'auto',padding:16 }}>
+          {loading ? <Spinner /> : items.length === 0 ? (
+            <p style={{ color:'#73818f',textAlign:'center',padding:20 }}>No {tab} found for this plan.</p>
+          ) : (
+            <table style={{ width:'100%',borderCollapse:'collapse',fontSize:13 }}>
+              <thead><tr style={{ background:'#f4f5fa' }}>
+                <th style={{ padding:'8px 12px',textAlign:'left',fontWeight:600 }}>Name</th>
+                <th style={{ padding:'8px 12px',textAlign:'left',fontWeight:600 }}>Value</th>
+                <th style={{ padding:'8px 12px',textAlign:'left',fontWeight:600 }}>Status</th>
+              </tr></thead>
+              <tbody>
+                {items.map((item,i) => (
+                  <tr key={i} style={{ borderBottom:'1px solid #e4e7ea' }}>
+                    <td style={{ padding:'8px 12px' }}>{item.name||item.endpointName||item.measureName||'—'}</td>
+                    <td style={{ padding:'8px 12px' }}>{item.value||item.endpointValue||'—'}</td>
+                    <td style={{ padding:'8px 12px' }}>{item.status||'—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div style={{ padding:'12px 20px',borderTop:'1px solid #e4e7ea',display:'flex',justifyContent:'flex-end' }}>
+          <button onClick={onClose} style={{ padding:'8px 20px',background:'#0197cc',color:'#fff',border:'none',borderRadius:5,cursor:'pointer',fontWeight:600 }}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Plan Report Modal (Chart / bar icon) ─── */
+function PlanReportModal({ planId, entityId, companyId, themeColor, onClose }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['planReport', planId, entityId],
+    queryFn: () => api.getReport({ _reportType: 'GOALPLAN', companyId, _entityId: entityId, _filter1: planId }),
+    select: r => r.data?.data || r.data?.result || r.data?.reports?.[0]?.details || [],
+  });
+
+  const rows = data || [];
+  return (
+    <div style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center' }}>
+      <div style={{ background:'#fff',borderRadius:8,width:640,maxHeight:'80vh',display:'flex',flexDirection:'column',boxShadow:'0 8px 32px rgba(0,0,0,0.2)' }}>
+        <div style={{ padding:'16px 20px',borderBottom:'1px solid #e4e7ea',display:'flex',justifyContent:'space-between',alignItems:'center' }}>
+          <h3 style={{ margin:0,fontSize:16,fontWeight:700,color:themeColor }}>Goal Plan Report</h3>
+          <button onClick={onClose} style={{ background:'none',border:'none',cursor:'pointer' }}><X size={18}/></button>
+        </div>
+        <div style={{ flex:1,overflowY:'auto',padding:16 }}>
+          {isLoading ? <Spinner /> : rows.length === 0 ? (
+            <p style={{ color:'#73818f',textAlign:'center',padding:32 }}>No report data available.</p>
+          ) : (
+            <table style={{ width:'100%',borderCollapse:'collapse',fontSize:13 }}>
+              <thead><tr style={{ background:'#f4f5fa' }}>
+                {Object.keys(rows[0]).map(k => <th key={k} style={{ padding:'8px 10px',textAlign:'left',fontWeight:600,borderBottom:'2px solid #e4e7ea' }}>{k}</th>)}
+              </tr></thead>
+              <tbody>
+                {rows.map((row,i) => (
+                  <tr key={i} style={{ borderBottom:'1px solid #e4e7ea' }}>
+                    {Object.values(row).map((v,j) => <td key={j} style={{ padding:'8px 10px' }}>{String(v??'—')}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div style={{ padding:'12px 20px',borderTop:'1px solid #e4e7ea',display:'flex',justifyContent:'flex-end' }}>
+          <button onClick={onClose} style={{ padding:'8px 20px',background:'#0197cc',color:'#fff',border:'none',borderRadius:5,cursor:'pointer',fontWeight:600 }}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Overall All-Users Report Modal (Stack icon) ─── */
+function OverallReportModal({ planId, entityId, companyId, onClose }) {
+  const today = new Date().toISOString().split('T')[0];
+  const monthAgo = new Date(Date.now()-30*24*60*60*1000).toISOString().split('T')[0];
+  const { data, isLoading } = useQuery({
+    queryKey: ['overallReport', companyId],
+    queryFn: () => api.getReport({ _reportType: 'LOGIN', companyId, _startDate: monthAgo, _endDate: today, _filterType:'DAY' }),
+    select: r => r.data?.data || r.data?.result || r.data?.reports?.[0]?.details || [],
+  });
+  const rows = data || [];
+  return (
+    <div style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center' }}>
+      <div style={{ background:'#fff',borderRadius:8,width:640,maxHeight:'80vh',display:'flex',flexDirection:'column',boxShadow:'0 8px 32px rgba(0,0,0,0.2)' }}>
+        <div style={{ padding:'16px 20px',borderBottom:'1px solid #e4e7ea',display:'flex',justifyContent:'space-between',alignItems:'center' }}>
+          <h3 style={{ margin:0,fontSize:16,fontWeight:700 }}>Overall Productivity Report</h3>
+          <button onClick={onClose} style={{ background:'none',border:'none',cursor:'pointer' }}><X size={18}/></button>
+        </div>
+        <div style={{ flex:1,overflowY:'auto',padding:16 }}>
+          {isLoading ? <Spinner /> : rows.length === 0 ? (
+            <p style={{ color:'#73818f',textAlign:'center',padding:32 }}>No report data for the last 30 days.</p>
+          ) : (
+            <div style={{ display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12,marginBottom:16 }}>
+              {rows.slice(0,8).map((r,i) => (
+                <div key={i} style={{ background:'#f4f5fa',borderRadius:8,padding:'12px 16px' }}>
+                  <div style={{ fontSize:18,fontWeight:700,color:'#0197cc' }}>{r.count || r.value || '—'}</div>
+                  <div style={{ fontSize:12,color:'#73818f',marginTop:2 }}>{r.reportDate || r.label || `Entry ${i+1}`}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div style={{ padding:'12px 20px',borderTop:'1px solid #e4e7ea',display:'flex',justifyContent:'flex-end' }}>
+          <button onClick={onClose} style={{ padding:'8px 20px',background:'#0197cc',color:'#fff',border:'none',borderRadius:5,cursor:'pointer',fontWeight:600 }}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Trending / Fire Report Modal ─── */
+function TrendingReportModal({ planId, entityId, companyId, onClose }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['trendingReport', companyId, entityId],
+    queryFn: () => api.getReport({ _reportType: 'PARTICIPATION', companyId, _entityId: entityId }),
+    select: r => r.data?.data || r.data?.result || r.data?.reports?.[0]?.details || [],
+  });
+  const rows = data || [];
+  const total = rows.reduce((s,r)=>s+(Number(r.count)||0),0);
+  return (
+    <div style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center' }}>
+      <div style={{ background:'#fff',borderRadius:8,width:560,maxHeight:'80vh',display:'flex',flexDirection:'column',boxShadow:'0 8px 32px rgba(0,0,0,0.2)' }}>
+        <div style={{ padding:'16px 20px',borderBottom:'1px solid #e4e7ea',display:'flex',justifyContent:'space-between',alignItems:'center' }}>
+          <h3 style={{ margin:0,fontSize:16,fontWeight:700,color:'#e74c3c' }}>Trending / Growth Activity</h3>
+          <button onClick={onClose} style={{ background:'none',border:'none',cursor:'pointer' }}><X size={18}/></button>
+        </div>
+        <div style={{ flex:1,overflowY:'auto',padding:16 }}>
+          {isLoading ? <Spinner /> : (
+            <>
+              <div style={{ background:'#fff9e6',border:'1px solid #ffc107',borderRadius:8,padding:'12px 16px',marginBottom:16 }}>
+                <div style={{ fontSize:22,fontWeight:700,color:'#e67e22' }}>{total}</div>
+                <div style={{ fontSize:13,color:'#73818f' }}>Total Participation Events</div>
+              </div>
+              {rows.length === 0 ? (
+                <p style={{ color:'#73818f',textAlign:'center',padding:20 }}>No trending data available.</p>
+              ) : (
+                rows.slice(0,10).map((r,i) => (
+                  <div key={i} style={{ display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid #f0f0f0' }}>
+                    <span style={{ fontSize:13,color:'#333' }}>{r.reportDate||r.label||`Entry ${i+1}`}</span>
+                    <span style={{ fontSize:13,fontWeight:700,color:'#e67e22' }}>{r.count||r.value||0}</span>
+                  </div>
+                ))
+              )}
+            </>
+          )}
+        </div>
+        <div style={{ padding:'12px 20px',borderTop:'1px solid #e4e7ea',display:'flex',justifyContent:'flex-end' }}>
+          <button onClick={onClose} style={{ padding:'8px 20px',background:'#0197cc',color:'#fff',border:'none',borderRadius:5,cursor:'pointer',fontWeight:600 }}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Invite Contributors Modal (Users icon) ─── */
+function InviteContributorsModal({ planId, entityId, companyId, onClose }) {
+  const [search, setSearch] = useState('');
+  const [allUsers, setAllUsers] = useState([]);
+  const [contributors, setContributors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [allRes, contribRes] = await Promise.all([
+          api.getAllContributors({ action: 'All', companyId, entityId, growthPlanId: planId }),
+          api.getAllContributors({ action: 'Contributors', companyId, entityId, growthPlanId: planId }),
+        ]);
+        const all = allRes.data?.EntityUser || allRes.data?.result || [];
+        const contrib = contribRes.data?.EntityUser || contribRes.data?.result || [];
+        setAllUsers(all);
+        setContributors(contrib.map(c => c.entityId));
+      } catch(e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  async function toggleContributor(user) {
+    const isContrib = contributors.includes(user.entityId);
+    setSaving(user.entityId);
+    try {
+      await api.addCGPContributor({
+        action: isContrib ? 'REMOVE' : 'ADD',
+        entityId,
+        companyId,
+        growthPlanId: planId,
+        contributorEntityId: user.entityId,
+      });
+      setContributors(prev =>
+        isContrib ? prev.filter(id => id !== user.entityId) : [...prev, user.entityId]
+      );
+      toast.success(isContrib ? 'Contributor removed' : 'Contributor added');
+    } catch(e) {
+      toast.error('Failed to update contributor');
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  const filtered = allUsers.filter(u => {
+    const name = ((u.firstName||'') + ' ' + (u.lastName||'')).toLowerCase();
+    return name.includes(search.toLowerCase());
+  });
+
+  return (
+    <div style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center' }}>
+      <div style={{ background:'#fff',borderRadius:8,width:500,maxHeight:'80vh',display:'flex',flexDirection:'column',boxShadow:'0 8px 32px rgba(0,0,0,0.2)' }}>
+        <div style={{ padding:'16px 20px',borderBottom:'1px solid #e4e7ea',display:'flex',justifyContent:'space-between',alignItems:'center' }}>
+          <h3 style={{ margin:0,fontSize:16,fontWeight:700 }}>Invite Contributors</h3>
+          <button onClick={onClose} style={{ background:'none',border:'none',cursor:'pointer' }}><X size={18}/></button>
+        </div>
+        <div style={{ padding:'12px 16px',borderBottom:'1px solid #e4e7ea' }}>
+          <input
+            type="text" value={search} onChange={e=>setSearch(e.target.value)}
+            placeholder="Search users..."
+            style={{ width:'100%',padding:'8px 12px',border:'1px solid #ced4da',borderRadius:6,fontSize:14,outline:'none',boxSizing:'border-box' }}
+          />
+        </div>
+        <div style={{ flex:1,overflowY:'auto',padding:'8px 0' }}>
+          {loading ? <Spinner /> : filtered.length===0 ? (
+            <p style={{ color:'#73818f',textAlign:'center',padding:20 }}>No users found.</p>
+          ) : filtered.map(u => {
+            const isContrib = contributors.includes(u.entityId);
+            return (
+              <div key={u.entityId} style={{ display:'flex',alignItems:'center',padding:'10px 16px',borderBottom:'1px solid #f0f0f0' }}>
+                <div style={{ width:36,height:36,borderRadius:'50%',background:'#6B3FA0',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:14,flexShrink:0 }}>
+                  {(u.firstName||'?')[0].toUpperCase()}
+                </div>
+                <div style={{ flex:1,marginLeft:12 }}>
+                  <div style={{ fontSize:14,fontWeight:600,color:'#23282c' }}>{u.firstName} {u.lastName}</div>
+                  <div style={{ fontSize:12,color:'#73818f' }}>{u.email||u.companyName||''}</div>
+                </div>
+                <button
+                  onClick={() => toggleContributor(u)}
+                  disabled={saving===u.entityId}
+                  style={{
+                    padding:'6px 14px',border:'none',borderRadius:5,cursor:'pointer',fontSize:13,fontWeight:600,
+                    background: isContrib ? '#dc3545' : '#0197cc',
+                    color:'#fff',opacity:saving===u.entityId?0.7:1,
+                  }}
+                >{saving===u.entityId ? '...' : isContrib ? 'Remove' : 'Add'}</button>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ padding:'12px 20px',borderTop:'1px solid #e4e7ea',display:'flex',justifyContent:'flex-end' }}>
+          <button onClick={onClose} style={{ padding:'8px 20px',background:'#6c757d',color:'#fff',border:'none',borderRadius:5,cursor:'pointer',fontWeight:600 }}>Done</button>
+        </div>
+      </div>
     </div>
   );
 }

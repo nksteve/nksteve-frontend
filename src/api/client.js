@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const BASE = '/api';
 
-const http = axios.create({ baseURL: BASE });
+export const http = axios.create({ baseURL: BASE });
 
 http.interceptors.request.use(cfg => {
   const token = localStorage.getItem('onup_token');
@@ -73,6 +73,9 @@ export const updateCompany = (data) => http.post('/updateCompany', data);
 
 // Reports & Analytics
 export const getReport = (data) => http.post('/reports', data);
+export const getReportDirect = (data) => http.post('/getReport', data);
+export const goalPlanReport = (data) => http.post('/goalPlanReport', data);
+export const goaltreeStructure = (data) => http.post('/goaltreeStructure', data);
 export const getAnalyticsCompany = (data) => http.post('/analyticsCompany', data);
 export const getAnalyticsData = (data) => http.post('/analyticsData', data);
 export const getAnalyticsConfig = (data) => http.post('/analyticsConfig', data);
@@ -80,6 +83,7 @@ export const companyMapping = (data) => http.post('/companyMapping', data);
 
 // Notifications
 export const getNotifications = (data) => http.post('/getNotifications', data);
+export const getNotification = (data) => http.post('/getNotification', data);
 export const getEntityDisplayActivity = (data) => http.post('/getEntityDisplayActivity', data);
 
 // ThoughtPad
@@ -106,3 +110,6 @@ export const getMyPlans = (data) => http.post('/getMyPlans', data);
 // Notes & Documents
 export const updateGoalActionNotes = (data) => http.post('/updateGoalActionNotes', data);
 export const updateGoalfile        = (data) => http.post('/updateGoalfile', data);
+export const updateEntityActivity = (data) => http.post('/updateEntityActivity', data);
+
+export default http;
