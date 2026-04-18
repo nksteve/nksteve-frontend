@@ -273,7 +273,7 @@ function YellowDot() {
 }
 
 /* ─── Goal header row — purple band matching vembu ─────────────────────────── */
-function GoalRow({ goal, goalActions, onChartClick, onNoteClick, onFileClick }) {
+function GoalRow({ goal, goalActions, onChartClick, onDecisionClick, onNoteClick, onFileClick }) {
   // Aggregate % from actions (average of actionGoalPercentAchieve)
   const actionPcts = goalActions.map(a => Number(a.actionGoalPercentAchieve || 0));
   const aggPct     = actionPcts.length > 0
@@ -333,7 +333,13 @@ function GoalRow({ goal, goalActions, onChartClick, onNoteClick, onFileClick }) 
           >
             <BarChart2 size={14} />
           </button>
-          <DecisionIcon color="rgba(255,255,255,0.75)" />
+          <button
+            onClick={() => onDecisionClick && onDecisionClick(goal, goalActions)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'rgba(255,255,255,0.75)', display: 'flex' }}
+            title="Decision"
+          >
+            <DecisionIcon color="rgba(255,255,255,0.75)" />
+          </button>
         </div>
       </td>
 
@@ -894,7 +900,137 @@ const MODAL_TABS = [
   { id: 'headsup',  Icon: MessageCircle,  label: 'HeadsUp' },
 ];
 
-function GoalChartModal({ goal, goalActions, onClose, initialTab = 'chart' }) {
+// ─── Decision Tab ────────────────────────────────────────────────────────────
+function DecisionTab({ goal, growthPlanId, entityId }) {
+  const [list, setList]           = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [adding, setAdding]       = useState(false);
+  const [text, setText]           = useState('');
+  const [date, setDate]           = useState(new Date().toISOString().slice(0,10));
+  const [saving, setSaving]       = useState(false);
+  const [editId, setEditId]       = useState(null);
+  const [editText, setEditText]   = useState('');
+  const [deleteId, setDeleteId]   = useState(null);
+
+  const goalTagId    = goal.goalTagId || goal.goalId || null;
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await api.decisionMaking({ action: 'GET', growthPlanId, teamId: growthPlanId, goalTagId, actionTagId: null, endPointId: null });
+      setList(res?.data?.results?.result || []);
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const save = async () => {
+    if (!text.trim()) return;
+    setSaving(true);
+    await api.decisionMaking({ action: 'INSERT', growthPlanId, teamId: growthPlanId, goalTagId, actionTagId: null, endPointId: null, entityId, decision: text, decisionDate: date });
+    setText(''); setDate(new Date().toISOString().slice(0,10)); setAdding(false);
+    await load();
+    setSaving(false);
+  };
+
+  const update = async (id) => {
+    if (!editText.trim()) return;
+    setSaving(true);
+    await api.decisionMaking({ action: 'UPDATE', decisionId: id, entityId, decision: editText });
+    setEditId(null); setEditText('');
+    await load();
+    setSaving(false);
+  };
+
+  const remove = async (id) => {
+    await api.decisionMaking({ action: 'DELETE', decisionId: id, entityId });
+    setDeleteId(null);
+    await load();
+  };
+
+  return (
+    <div style={{ padding: '16px 20px' }}>
+      {/* Header row */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Decision ({goal.goalName})</div>
+        {!adding && (
+          <button onClick={() => setAdding(true)}
+            style={{ background: '#27ae60', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 16px', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
+            + Add Decision
+          </button>
+        )}
+      </div>
+
+      {/* Add form */}
+      {adding && (
+        <div style={{ background: '#EEF4FF', border: '1px solid #d0dcf8', borderRadius: 8, padding: 14, marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 10, alignItems: 'center' }}>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              style={{ border: '1px solid #ccc', borderRadius: 4, padding: '4px 8px', fontSize: 13 }} />
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              <button onClick={() => { setAdding(false); setText(''); }}
+                style={{ background: '#fff', color: '#27ae60', border: '1px solid #27ae60', borderRadius: 4, padding: '4px 14px', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+              <button onClick={save} disabled={saving || !text.trim()}
+                style={{ background: '#27ae60', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 14px', cursor: 'pointer', fontSize: 13 }}>
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+          <textarea value={text} onChange={e => setText(e.target.value)} placeholder="Write your decision here..."
+            style={{ width: '100%', minHeight: 80, padding: 8, border: '1px solid #ccc', borderRadius: 4, fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }} />
+        </div>
+      )}
+
+      {/* List */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 30, color: C.teal, fontSize: 14 }}>Loading...</div>
+      ) : list.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 30, color: C.text2, fontSize: 14 }}>
+          <DecisionIcon color={C.teal} />
+          <div style={{ marginTop: 10 }}>No Decision</div>
+        </div>
+      ) : list.map(d => (
+        <div key={d.id} style={{ background: '#f8f9ff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 14, marginBottom: 10 }}>
+          {editId === d.id ? (
+            <div>
+              <textarea value={editText} onChange={e => setEditText(e.target.value)}
+                style={{ width: '100%', minHeight: 70, padding: 8, border: '1px solid #ccc', borderRadius: 4, fontSize: 13, resize: 'vertical', boxSizing: 'border-box', marginBottom: 8 }} />
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button onClick={() => { setEditId(null); setEditText(''); }}
+                  style={{ background: '#fff', color: '#27ae60', border: '1px solid #27ae60', borderRadius: 4, padding: '3px 12px', cursor: 'pointer', fontSize: 12 }}>Cancel</button>
+                <button onClick={() => update(d.id)} disabled={saving}
+                  style={{ background: '#27ae60', color: '#fff', border: 'none', borderRadius: 4, padding: '3px 12px', cursor: 'pointer', fontSize: 12 }}>Save</button>
+              </div>
+            </div>
+          ) : deleteId === d.id ? (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ marginBottom: 10, fontSize: 13 }}>Delete this decision?</div>
+              <button onClick={() => remove(d.id)}
+                style={{ background: '#e74c3c', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 14px', cursor: 'pointer', marginRight: 8, fontSize: 13 }}>Delete</button>
+              <button onClick={() => setDeleteId(null)}
+                style={{ background: '#fff', border: '1px solid #ccc', borderRadius: 4, padding: '4px 14px', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+            </div>
+          ) : (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{d.firstName} {d.lastName}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 12, color: C.text2 }}>{d.decisionDate ? new Date(d.decisionDate).toLocaleDateString() : ''}</span>
+                  <svg onClick={() => { setEditId(d.id); setEditText(d.decisions || ''); }} style={{ cursor: 'pointer', color: C.teal }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={C.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  <svg onClick={() => setDeleteId(d.id)} style={{ cursor: 'pointer' }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#e74c3c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </div>
+              </div>
+              <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }} dangerouslySetInnerHTML={{ __html: d.decisions || '' }} />
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function GoalChartModal({ goal, goalActions, onClose, initialTab = 'chart', growthPlanId, entityId }) {
   const [modalTab, setModalTab] = useState(initialTab);
 
   return (
@@ -986,14 +1122,7 @@ function GoalChartModal({ goal, goalActions, onClose, initialTab = 'chart' }) {
             </div>
           )}
           {modalTab === 'decision' && (
-            <div style={{ textAlign: 'center', padding: 30, color: C.text2 }}>
-              <DecisionIcon color={C.teal} />
-              <div style={{ marginTop: 10, fontSize: 15, fontWeight: 600, color: C.text }}>Decision ({goal.goalName})</div>
-              <div style={{ marginTop: 6, fontSize: 13 }}>No Decision</div>
-              <button style={{ marginTop: 14, padding: '7px 18px', background: '#27ae60', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>
-                + Add Decision
-              </button>
-            </div>
+            <DecisionTab goal={goal} growthPlanId={growthPlanId} entityId={entityId} />
           )}
           {modalTab === 'headsup' && (
             <div style={{ padding: 8 }}>
@@ -1428,6 +1557,7 @@ export default function WorkPlan() {
                   goal={goal}
                   goalActions={goalActions}
                   onChartClick={(g, ga) => setChartGoal({ goal: g, goalActions: ga, initialTab: 'chart' })}
+                  onDecisionClick={(g, ga) => setChartGoal({ goal: g, goalActions: ga, initialTab: 'decision' })}
                   onNoteClick={() => setNotesCtx({ growthPlanId: Number(planId), goalTagId: goal.goalTagId, actionTagId: null, planColor: themeColor })}
                   onFileClick={() => setFilesCtx({ growthPlanId: Number(planId), goalTagId: goal.goalTagId, actionTagId: null, planColor: themeColor })}
                 />,
@@ -1478,6 +1608,8 @@ export default function WorkPlan() {
           goalActions={chartGoal.goalActions}
           initialTab={chartGoal.initialTab || 'chart'}
           onClose={() => setChartGoal(null)}
+          growthPlanId={Number(planId)}
+          entityId={entityId}
         />
       )}
       {notesCtx && (

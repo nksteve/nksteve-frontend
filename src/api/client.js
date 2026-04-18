@@ -136,3 +136,6 @@ export const updateGoalfile        = (data) => http.post('/updateGoalfile', data
 export const updateEntityActivity = (data) => http.post('/updateEntityActivity', data);
 
 export default http;
+
+// Decision Making
+export const decisionMaking = (data) => http.post('/decisionMaking', data);
