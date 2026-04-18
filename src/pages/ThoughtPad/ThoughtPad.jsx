@@ -1,272 +1,321 @@
-import { useState, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'react-toastify';
-import { Plus, BookOpen, Clock, Save, Loader2 } from 'lucide-react';
+/**
+ * ThoughtPad — matches Vembu's ThoughtPadMenu / ThoughtPadList / ThoughtPadEditor
+ * Left panel: list of thoughts with delete confirm modal
+ * Right panel: title input + rich text editor (ReactQuill) + Save button
+ */
+import { useState, useEffect, useRef } from 'react';
+import { Loader2, Plus, Trash2, BookOpen, Save, Search } from 'lucide-react';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
-import * as api from '../../api/client';
+import axios from 'axios';
 import useAuthStore from '../../store/authStore';
 
+const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
 const C = {
-  primary: '#0197cc',
-  primaryLight: '#e6f7fd',
-  surface: '#FFFFFF',
-  bg: '#F8FAFC',
-  border: '#E2E8F0',
-  text: '#0F172A',
-  text2: '#64748B',
+  primary:  '#0197cc',
+  purple:   '#6B3FA0',
+  surface:  '#FFFFFF',
+  bg:       '#f4f5fa',
+  border:   '#dde1e9',
+  text:     '#212529',
+  text2:    '#6c757d',
+  danger:   '#dc3545',
 };
+
+function http(method, url, data, token) {
+  return axios({ method, url: BASE + url, data,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
+}
 
 function Spinner() {
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
-      <Loader2 size={32} color={C.primary} style={{ animation: 'spin 1s linear infinite' }} />
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+    <div style={{ display:'flex', justifyContent:'center', padding:40 }}>
+      <Loader2 size={28} color={C.primary} style={{ animation:'spin 1s linear infinite' }}/>
+      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }
 
 export default function ThoughtPad() {
-  const { user } = useAuthStore();
+  const { user, token } = useAuthStore();
   const entityId = user?.entityId;
-  const queryClient = useQueryClient();
-  const [selectedId, setSelectedId] = useState(null);
-  const [editorContent, setEditorContent] = useState('');
-  const [newTitle, setNewTitle] = useState('');
-  const [isAdding, setIsAdding] = useState(false);
-  const [isDirty, setIsDirty] = useState(false);
+  const tok = typeof token === 'function' ? token() : token;
 
-  const { data: thoughts = [], isLoading } = useQuery({
-    queryKey: ['thoughtpad', entityId],
-    queryFn: () => api.getThoughtpad({ entityId }),
-    select: (res) => res.data?.thoughts || res.data?.result || [],
-    enabled: !!entityId,
-  });
+  const [thoughts,      setThoughts]    = useState([]);
+  const [loading,       setLoading]     = useState(true);
+  const [selectedIdx,   setSelectedIdx] = useState(null);  // index into thoughts[]
+  const [title,         setTitle]       = useState('');
+  const [content,       setContent]     = useState('');
+  const [saving,        setSaving]      = useState(false);
+  const [delConfirm,    setDelConfirm]  = useState(null);  // thoughtId to delete
+  const [validMsg,      setValidMsg]    = useState('');
+  const [search,        setSearch]      = useState('');
+  const [isAdding,      setIsAdding]    = useState(false); // true = new thought mode
+  const contentRef = useRef(content);
+  contentRef.current = content;
 
-  const selectedThought = thoughts.find(t => t.thoughtId === selectedId || t.id === selectedId);
+  // ── Load ───────────────────────────────────────────────────────────────
+  const load = async () => {
+    setLoading(true);
+    try {
+      const r = await http('POST', '/getThoughtpads', { entityId }, tok);
+      const list = r.data?.thoughtPad || r.data?.thoughtpads || [];
+      setThoughts(Array.isArray(list) ? list : []);
+    } catch { setThoughts([]); }
+    finally { setLoading(false); }
+  };
 
-  const updateMutation = useMutation({
-    mutationFn: (data) => api.updateThoughtpad(data),
-    onSuccess: () => {
-      toast.success('Saved!', { autoClose: 1500 });
-      queryClient.invalidateQueries(['thoughtpad']);
-      setIsDirty(false);
-    },
-    onError: () => toast.error('Failed to save'),
-  });
+  useEffect(() => { if (entityId) load(); }, [entityId]);
 
-  const addThoughtMutation = useMutation({
-    mutationFn: () => api.updateThoughtpad({
-      entityId,
-      action: 'ADD',
-      thoughtTitle: newTitle,
-      thoughtContent: '',
-    }),
-    onSuccess: (res) => {
-      toast.success('Thought added!');
-      queryClient.invalidateQueries(['thoughtpad']);
+  // ── Select a thought ───────────────────────────────────────────────────
+  const select = (idx) => {
+    setSelectedIdx(idx);
+    setIsAdding(false);
+    setValidMsg('');
+    const t = thoughts[idx];
+    setTitle(t?.title || '');
+    setContent(t?.thought || '');
+  };
+
+  // ── New thought ────────────────────────────────────────────────────────
+  const startNew = () => {
+    setIsAdding(true);
+    setSelectedIdx(null);
+    setTitle('');
+    setContent('');
+    setValidMsg('');
+  };
+
+  // ── Save (insert or update) ────────────────────────────────────────────
+  const save = async () => {
+    if (!title.trim()) { setValidMsg('Please provide title'); return; }
+    const contentStr = contentRef.current;
+    if (contentStr && contentStr.replace(/<[^>]*>/g, '').trim().length > 4999) {
+      alert('Value should not exceed 5000 characters'); return;
+    }
+    setSaving(true);
+    setValidMsg('');
+    try {
+      let r;
+      if (isAdding) {
+        // INSERT — Vembu calls /insertThoughtpad
+        r = await http('POST', '/insertThoughtpad', { entityId, title, thought: contentStr }, tok);
+      } else {
+        // UPDATE — Vembu calls /insertThoughtpad with thoughtId set
+        const thoughtId = thoughts[selectedIdx]?.thoughtId;
+        r = await http('POST', '/insertThoughtpad', { entityId, title, thought: contentStr, thoughtId }, tok);
+      }
+      const updated = r.data?.thoughtPad || r.data?.thoughtpads || [];
+      setThoughts(Array.isArray(updated) ? updated : []);
       setIsAdding(false);
-      setNewTitle('');
-      const newId = res.data?.thoughtId || res.data?.id;
-      if (newId) setSelectedId(newId);
-    },
-    onError: () => toast.error('Failed to create thought'),
-  });
-
-  const handleSelect = (thought) => {
-    if (isDirty && selectedThought) {
-      handleSave();
-    }
-    const id = thought.thoughtId || thought.id;
-    setSelectedId(id);
-    setEditorContent(thought.thoughtContent || thought.content || '');
-    setIsDirty(false);
+      // Re-select the just-saved item (first match by title)
+      const newList = Array.isArray(updated) ? updated : [];
+      const newIdx  = newList.findIndex(t => t.title === title);
+      if (newIdx >= 0) { setSelectedIdx(newIdx); setContent(newList[newIdx]?.thought || ''); }
+    } catch { alert('Failed to save'); }
+    finally { setSaving(false); }
   };
 
-  const handleEditorChange = (val) => {
-    setEditorContent(val);
-    setIsDirty(true);
+  // ── Delete ─────────────────────────────────────────────────────────────
+  const confirmDelete = (thoughtId) => setDelConfirm(thoughtId);
+  const doDelete = async () => {
+    try {
+      const r = await http('POST', '/deleteThoughtpad', { entityId, thoughtId: delConfirm }, tok);
+      const updated = r.data?.thoughtPad || r.data?.thoughtpads || [];
+      setThoughts(Array.isArray(updated) ? updated : []);
+      setDelConfirm(null);
+      setSelectedIdx(null);
+      setTitle('');
+      setContent('');
+    } catch { alert('Failed to delete'); }
   };
 
-  const handleSave = useCallback(() => {
-    if (!selectedThought) return;
-    updateMutation.mutate({
-      entityId,
-      action: 'UPDATE',
-      thoughtId: selectedThought.thoughtId || selectedThought.id,
-      thoughtContent: editorContent,
-    });
-  }, [selectedThought, editorContent, entityId]);
+  // ── Filtered list ──────────────────────────────────────────────────────
+  const filtered = thoughts.filter(t =>
+    !search || (t.title || '').toLowerCase().includes(search.toLowerCase())
+  );
 
-  const handleBlur = () => {
-    if (isDirty && selectedThought) {
-      handleSave();
-    }
+  const fmt = (d) => d ? new Date(d).toLocaleDateString('en-US') : '';
+
+  // Decode HTML entities for plain-text preview
+  const stripHtml = (html) => {
+    if (!html) return '';
+    return html
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
   };
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 64px)', background: C.bg }}>
-      {/* Left sidebar */}
+    <div style={{ display:'flex', height:'calc(100vh - 56px)', background:C.bg }}>
+
+      {/* ── LEFT PANEL ── */}
       <div style={{
-        width: 280,
-        minWidth: 280,
-        background: C.surface,
-        borderRight: `1px solid ${C.border}`,
-        display: 'flex',
-        flexDirection: 'column',
+        width:300, minWidth:300, background:C.surface,
+        borderRight:`1px solid ${C.border}`, display:'flex', flexDirection:'column',
       }}>
-        <div style={{ padding: '20px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <BookOpen size={18} color={C.primary} />
-            <span style={{ fontWeight: 700, fontSize: 15, color: C.text }}>ThoughtPad</span>
+        {/* Header */}
+        <div style={{ padding:'16px 16px 12px', borderBottom:`1px solid ${C.border}` }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <BookOpen size={17} color={C.primary}/>
+              <span style={{ fontWeight:700, fontSize:16, color:C.text }}>Thought Pad</span>
+            </div>
+            <button onClick={startNew}
+              style={{ background:C.primary, border:'none', borderRadius:6,
+                       padding:'5px 10px', cursor:'pointer', color:'#fff',
+                       display:'flex', alignItems:'center', gap:4, fontSize:12, fontWeight:600 }}>
+              <Plus size={13}/> Add
+            </button>
           </div>
-          <button
-            onClick={() => setIsAdding(true)}
-            style={{ background: C.primary, border: 'none', borderRadius: 6, padding: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#fff' }}
-          >
-            <Plus size={16} />
-          </button>
+          {/* Search */}
+          <div style={{ position:'relative' }}>
+            <Search size={13} color={C.text2}
+              style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)' }}/>
+            <input value={search} onChange={e=>setSearch(e.target.value)}
+              placeholder="Search..."
+              style={{ width:'100%', padding:'6px 8px 6px 28px', border:`1px solid ${C.border}`,
+                       borderRadius:6, fontSize:13, outline:'none', boxSizing:'border-box' }}/>
+          </div>
         </div>
 
-        {isAdding && (
-          <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`, background: C.primaryLight }}>
-            <input
-              autoFocus
-              type="text"
-              value={newTitle}
-              onChange={e => setNewTitle(e.target.value)}
-              placeholder="Thought title…"
-              onKeyDown={e => {
-                if (e.key === 'Enter' && newTitle.trim()) addThoughtMutation.mutate();
-                if (e.key === 'Escape') setIsAdding(false);
-              }}
-              style={{ width: '100%', padding: '8px 10px', border: `1px solid ${C.primary}`, borderRadius: 6, fontSize: 14, outline: 'none', boxSizing: 'border-box', marginBottom: 8 }}
-            />
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => newTitle.trim() && addThoughtMutation.mutate()}
-                disabled={addThoughtMutation.isPending}
-                style={{ flex: 1, padding: '6px', background: C.primary, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
-              >
-                {addThoughtMutation.isPending ? '…' : 'Add'}
-              </button>
-              <button onClick={() => { setIsAdding(false); setNewTitle(''); }} style={{ flex: 1, padding: '6px', background: '#fff', border: `1px solid ${C.border}`, borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          {isLoading && (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: 20 }}>
-              <Loader2 size={20} color={C.primary} style={{ animation: 'spin 1s linear infinite' }} />
+        {/* List */}
+        <div style={{ flex:1, overflowY:'auto' }}>
+          {loading && <Spinner/>}
+          {!loading && filtered.length === 0 && (
+            <div style={{ padding:'32px 16px', textAlign:'center', color:C.text2, fontSize:13 }}>
+              No thoughts yet. Click Add to create one.
             </div>
           )}
-          {!isLoading && thoughts.length === 0 && (
-            <div style={{ padding: '40px 16px', textAlign: 'center', color: C.text2, fontSize: 13 }}>
-              No thoughts yet. Click + to add one.
-            </div>
-          )}
-          {thoughts.map((t, i) => {
-            const id = t.thoughtId || t.id;
-            const isSelected = id === selectedId;
+          {filtered.map((t, i) => {
+            const isSelected = !isAdding && thoughts[selectedIdx]?.thoughtId === t.thoughtId;
             return (
-              <div
-                key={i}
-                onClick={() => handleSelect(t)}
+              <div key={t.thoughtId || i} onClick={() => select(thoughts.indexOf(t))}
                 style={{
-                  padding: '14px 16px',
-                  cursor: 'pointer',
-                  background: isSelected ? C.primaryLight : 'transparent',
+                  padding:'12px 16px', cursor:'pointer', borderBottom:`1px solid ${C.border}`,
+                  background: isSelected ? '#e8f4fd' : 'transparent',
                   borderLeft: isSelected ? `3px solid ${C.primary}` : '3px solid transparent',
-                  borderBottom: `1px solid ${C.border}`,
-                  transition: 'all 0.1s',
-                }}
-                onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#F8FAFC'; }}
-                onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
-              >
-                <div style={{ fontWeight: isSelected ? 600 : 500, fontSize: 14, color: isSelected ? C.primary : C.text, marginBottom: 4 }}>
-                  {t.thoughtTitle || t.title || 'Untitled'}
+                  transition:'background .1s',
+                }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                  <h5 style={{ margin:'0 0 4px', fontSize:14, fontWeight:isSelected?700:500,
+                               color: isSelected ? C.primary : C.text, flex:1,
+                               whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                    {t.title || 'Untitled'}
+                  </h5>
+                  <span onClick={e => { e.stopPropagation(); confirmDelete(t.thoughtId); }}
+                    style={{ color:C.danger, cursor:'pointer', marginLeft:8, flexShrink:0 }}>
+                    <Trash2 size={14}/>
+                  </span>
                 </div>
-                {t.createdOn && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: C.text2 }}>
-                    <Clock size={10} />
-                    {new Date(t.createdOn).toLocaleDateString()}
-                  </div>
-                )}
+                {/* Preview (strip HTML) */}
+                <div style={{ fontSize:12, color:C.text2, marginBottom:4,
+                              overflow:'hidden', maxHeight:36,
+                              display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>
+                  {stripHtml(t.thought || '').substring(0, 80)}
+                </div>
+                <small style={{ color:C.text2, fontSize:11 }}>{fmt(t.created || t.lastUpdated)}</small>
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* Right panel */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {!selectedThought ? (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.text2 }}>
-            <div style={{ textAlign: 'center' }}>
-              <BookOpen size={48} style={{ color: '#CBD5E1', marginBottom: 16 }} />
-              <p style={{ margin: 0, fontSize: 15 }}>Select a thought to edit, or click + to create one.</p>
+      {/* ── RIGHT PANEL (Editor) ── */}
+      <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', background:C.surface }}>
+        {(!isAdding && selectedIdx === null) ? (
+          <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', color:C.text2 }}>
+            <div style={{ textAlign:'center' }}>
+              <BookOpen size={52} style={{ color:'#CBD5E1', marginBottom:16 }}/>
+              <p style={{ margin:0, fontSize:15 }}>Select a thought to edit, or click Add to create one.</p>
             </div>
           </div>
         ) : (
           <>
-            <div style={{ padding: '16px 24px', borderBottom: `1px solid ${C.border}`, background: C.surface, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: C.text }}>
-                  {selectedThought.thoughtTitle || selectedThought.title || 'Untitled'}
-                </h2>
-                {selectedThought.createdOn && (
-                  <div style={{ fontSize: 12, color: C.text2, marginTop: 2 }}>
-                    {new Date(selectedThought.createdOn).toLocaleString()}
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={handleSave}
-                disabled={updateMutation.isPending || !isDirty}
+            {/* Title bar */}
+            <div style={{ padding:'16px 24px', borderBottom:`1px solid ${C.border}` }}>
+              <input type="text" value={title} onChange={e=>{ setTitle(e.target.value); setValidMsg(''); }}
+                placeholder="Title"
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '9px 16px',
-                  background: isDirty ? C.primary : '#E2E8F0',
-                  color: isDirty ? '#fff' : C.text2,
-                  border: 'none',
-                  borderRadius: 8,
-                  cursor: isDirty ? 'pointer' : 'default',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  transition: 'all 0.15s',
-                }}
-              >
-                <Save size={14} />
-                {updateMutation.isPending ? 'Saving…' : isDirty ? 'Save' : 'Saved'}
-              </button>
+                  width:'75%', padding:'8px 12px', fontSize:15, fontWeight:600,
+                  border:`1px solid ${C.border}`, borderRadius:6, outline:'none',
+                  boxSizing:'border-box',
+                }}/>
             </div>
-            <div style={{ flex: 1, overflow: 'auto', padding: 0 }}>
+
+            {/* Rich text editor */}
+            <div style={{ flex:1, overflow:'auto', padding:'0' }}>
               <ReactQuill
-                value={editorContent}
-                onChange={handleEditorChange}
-                onBlur={handleBlur}
+                value={content}
+                onChange={val => setContent(val)}
                 placeholder="Start writing your thoughts here…"
-                style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+                style={{ height:'calc(100% - 42px)' }}
                 modules={{
                   toolbar: [
-                    [{ header: [1, 2, 3, false] }],
-                    ['bold', 'italic', 'underline', 'strike'],
-                    [{ list: 'ordered' }, { list: 'bullet' }],
-                    ['blockquote', 'code-block'],
+                    [{ header:[1,2,3,false] }],
+                    ['bold','italic','underline','strike'],
+                    [{ list:'ordered' }, { list:'bullet' }],
+                    ['blockquote','code-block'],
                     ['link'],
                     ['clean'],
                   ],
                 }}
               />
             </div>
+
+            {/* Footer: save button + validation msg */}
+            <div style={{ padding:'12px 24px', borderTop:`1px solid ${C.border}`,
+                          display:'flex', alignItems:'center', gap:12, background:C.bg }}>
+              <button onClick={save} disabled={saving}
+                style={{
+                  padding:'8px 22px', background:C.primary, color:'#fff',
+                  border:'none', borderRadius:6, cursor:'pointer',
+                  fontWeight:600, fontSize:14, opacity: saving ? 0.7 : 1,
+                }}>
+                {saving ? 'Saving…' : (isAdding ? 'Add' : 'Save')}
+              </button>
+              {validMsg && (
+                <span style={{ color:C.primary, fontSize:13, fontWeight:600 }}>
+                  {validMsg}
+                </span>
+              )}
+            </div>
           </>
         )}
       </div>
+
+      {/* ── Delete Confirm Modal ── */}
+      {delConfirm && (
+        <div style={{
+          position:'fixed', inset:0, background:'rgba(0,0,0,0.5)',
+          zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center',
+        }}>
+          <div style={{ background:C.surface, borderRadius:10, padding:28, width:380, maxWidth:'90vw', boxShadow:'0 8px 32px rgba(0,0,0,0.18)' }}>
+            <h5 style={{ margin:'0 0 12px', fontSize:16, fontWeight:700 }}>Info</h5>
+            <p style={{ textAlign:'center', margin:'0 0 20px', color:C.text }}>
+              Are you sure you want to delete this thought?
+            </p>
+            <div style={{ display:'flex', justifyContent:'flex-end', gap:10 }}>
+              <span onClick={() => setDelConfirm(null)}
+                style={{ cursor:'pointer', color:C.text2, padding:'7px 14px', fontSize:14 }}>
+                Cancel
+              </span>
+              <button onClick={doDelete}
+                style={{ padding:'7px 18px', background:C.primary, color:'#fff',
+                         border:'none', borderRadius:6, cursor:'pointer', fontWeight:600, fontSize:14 }}>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

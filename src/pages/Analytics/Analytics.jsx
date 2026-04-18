@@ -1,250 +1,458 @@
-import { useQuery } from '@tanstack/react-query';
-import { Loader2, Users, Building, TrendingUp, Activity } from 'lucide-react';
-import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-} from 'recharts';
-import * as api from '../../api/client';
+/**
+ * Analytics — matches Vembu AnalyticsReport.js + CommonGraph.js
+ * Primary company selector, optional comparison company, multi-year period selector
+ * 20 financial metric charts with BAR / LINE / MULTIBAR types and formula evaluation
+ */
+import { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
 import useAuthStore from '../../store/authStore';
+import { Loader2, Info } from 'lucide-react';
+import {
+  BarChart, Bar, LineChart, Line,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell,
+} from 'recharts';
+
+const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 const C = {
   primary: '#0197cc',
-  primaryLight: '#e6f7fd',
-  success: '#10B981',
-  warning: '#F59E0B',
-  danger: '#EF4444',
+  purple:  '#6B3FA0',
+  teal:    '#0086c0',
   surface: '#FFFFFF',
-  bg: '#F8FAFC',
-  border: '#E2E8F0',
-  text: '#0F172A',
-  text2: '#64748B',
+  bg:      '#f4f5fa',
+  border:  '#dde1e9',
+  text:    '#212529',
+  text2:   '#6c757d',
 };
 
-const PIE_COLORS = [C.primary, C.success, C.warning, '#EC4899', '#0EA5E9'];
+const BAR_COLORS = ['#0197cc','#6B3FA0','#00b0a0','#e67e22','#e74c3c','#2ecc71','#9b59b6'];
 
-function Spinner() {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
-      <Loader2 size={32} color={C.primary} style={{ animation: 'spin 1s linear infinite' }} />
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-    </div>
-  );
+// ── Graph metric definitions (from Vembu AnalyticsReport.js) ─────────────────
+const GRAPH_DETAILS = [
+  { metric:'Total Capital',               type:'USD',     chartType:'BAR',      pattern:'940 + 668 + RB0005 + 658 + 658A + 661A' },
+  { metric:'Total Income',                type:'USD',     chartType:'BAR',      pattern:'115 + 117' },
+  { metric:'Interest Income',             type:'USD',     chartType:'BAR',      pattern:'115' },
+  { metric:'Non-Interest Income',         type:'USD',     chartType:'BAR',      pattern:'117' },
+  { metric:'Net Income',                  type:'USD',     chartType:'BAR',      pattern:'661A' },
+  { metric:'Total Expenses',              type:'USD',     chartType:'BAR',      pattern:'671 + 350 + IS0017' },
+  { metric:'Operating Expenses',          type:'USD',     chartType:'BAR',      pattern:'671' },
+  { metric:'Total Interest Expenses',     type:'USD',     chartType:'BAR',      pattern:'350' },
+  { metric:'Total Members',               type:'COUNT',   chartType:'BAR',      pattern:'083' },
+  { metric:'Total Deposits',              type:'USD',     chartType:'BAR',      pattern:'SH0018' },
+  { metric:'Checking/Total Deposits',     type:'PERCENT', chartType:'LINE',     pattern:'902/SH0018' },
+  { metric:'Total Delinquency',           type:'USD',     chartType:'BAR',      pattern:'041B' },
+  { metric:'Efficiency Ratio',            type:'PERCENT', chartType:'LINE',     pattern:'(671/(115 + 117 - 350)) * 100' },
+  { metric:'Deposit Trends to Certificates', type:'PERCENT', chartType:'LINE',  pattern:'(908C/SH0018)' },
+  { metric:'Loan Growth',                 type:'PERCENT', chartType:'BAR',      annualize:'AVG', pattern:'(025B1(Current) - 025B1(Prior))/025B1(Prior)*100' },
+  { metric:'Yield on Loans',              type:'PERCENT', chartType:'LINE',     annualize:'AVG', pattern:'(110/025B1)*100' },
+  { metric:'Loan Type by Percentage',     type:'PERCENT', chartType:'MULTIBAR', annualize:'AVG',
+    pattern:['(703A/025B1)*100','((386B + 386A)/025B1)*100','(370/025B1)*100','(385/025B1)*100','(396/025B1)*100','(698C/025B1)*100','((397 + 397A)/025B1)*100'] },
+  { metric:'Total Assets',                type:'USD',     chartType:'BAR',      pattern:'010' },
+  { metric:'Net Worth Ratio',             type:'PERCENT', chartType:'BAR',      pattern:'(997/NW0010)*100' },
+  { metric:'Net Interest Margin',         type:'PERCENT', chartType:'BAR',      annualize:'AVG', pattern:'((115-350)/010)*100' },
+];
+
+// ── Value formatter (matches Vembu's valueConvter) ────────────────────────────
+function fmtValue(unit, val) {
+  const v = isFinite(val) && val ? val : 0;
+  if (unit === 2) { // USD
+    if (Math.abs(v) >= 1e9) return `$${(v/1e9).toFixed(1)}B`;
+    if (Math.abs(v) >= 1e6) return `$${(v/1e6).toFixed(1)}M`;
+    if (Math.abs(v) >= 1e3) return `$${(v/1e3).toFixed(1)}K`;
+    return `$${v.toFixed(0)}`;
+  }
+  if (unit === 0) return `${Number(v).toFixed(1)}%`; // PERCENT
+  return Number.isInteger(v) ? String(v) : v.toFixed(0);               // COUNT
 }
 
-function KPICard({ label, value, sub, icon: Icon, color }) {
-  return (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '20px 24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: C.text }}>{value}</div>
-          <div style={{ fontSize: 13, color: C.text2, marginTop: 4 }}>{label}</div>
-          {sub && <div style={{ fontSize: 12, color: C.text2, marginTop: 2 }}>{sub}</div>}
+const typeUnit = (t) => t==='USD' ? 2 : t==='PERCENT' ? 0 : 1;
+
+// ── Transform raw API rows → periodData ──────────────────────────────────────
+// periodData = [{ periodDate, periodName, data:[{configAccount,configCategory,value,valueType}] }]
+function buildPeriodData(rawRows) {
+  const byPeriod = {};
+  for (const r of rawRows) {
+    const key = r.rp_peroidDate || r.rp_name || String(r.rp_peroidYear);
+    if (!byPeriod[key]) byPeriod[key] = { periodDate: key, periodName: r.rp_name, data: [] };
+    byPeriod[key].data.push({
+      configAccount:  r.rd_rconfig_account,
+      configCategory: r.rd_rconfig_category,
+      value:          r.rd_value || 0,
+      valueType:      r.rd_valueType,
+    });
+  }
+  return Object.values(byPeriod).sort((a,b) => new Date(a.periodDate) - new Date(b.periodDate));
+}
+
+// ── Annualise periodData ───────────────────────────────────────────────────────
+function annualise(periodData, type) {
+  const yearGroups = {};
+  for (const p of periodData) {
+    const y = p.periodName ? p.periodName.split('-')[1] || p.periodName : String(p.periodDate).substring(0,4);
+    (yearGroups[y] = yearGroups[y] || []).push(...p.data);
+  }
+  return Object.entries(yearGroups).map(([year, allData]) => {
+    const accMap = {};
+    for (const item of allData) {
+      if (!accMap[item.configAccount]) accMap[item.configAccount] = { ...item, count:0, value:0 };
+      accMap[item.configAccount].value += item.value;
+      accMap[item.configAccount].count++;
+    }
+    const result = Object.values(accMap);
+    if (type === 'AVG') result.forEach(r => { r.value = (r.value / r.count) * 4; });
+    return { periodDate: year, periodName: year, data: result };
+  });
+}
+
+// ── Safe eval formula (no real eval — uses regex substitution) ────────────────
+function evalFormula(pattern, dataMap) {
+  // Replace each account code with its value
+  let expr = pattern.replace(/[A-Z0-9]+/gi, (match) => {
+    const val = dataMap[match];
+    return val !== undefined ? val : match;
+  });
+  try {
+    // eslint-disable-next-line no-new-func
+    const result = Function('"use strict"; return (' + expr + ')')();
+    return isFinite(result) ? result : 0;
+  } catch { return 0; }
+}
+
+// ── Generate chart data points from periodData + pattern ─────────────────────
+function generateData(periodData, pattern, annualizeType) {
+  let pd = annualizeType ? annualise(periodData, annualizeType) : periodData;
+
+  if (typeof pattern === 'string') {
+    if (pattern.includes('Prior') || pattern.includes('Current')) {
+      return pd.map((p, i) => {
+        if (i === 0) return { date: p.periodDate, value: 0 };
+        const cur   = pd[i].data.find(d => d.configAccount === '025B1')?.value || 0;
+        const prior = pd[i-1].data.find(d => d.configAccount === '025B1')?.value || 1;
+        return { date: p.periodDate, value: parseFloat((((cur - prior) / prior) * 100).toFixed(2)) };
+      });
+    }
+    return pd.map(p => {
+      const dm = {};
+      p.data.forEach(d => { dm[d.configAccount] = d.value; });
+      const val = evalFormula(pattern, dm);
+      return { date: p.periodDate, value: parseFloat(Number(val).toFixed(2)) };
+    });
+  } else if (Array.isArray(pattern)) {
+    return pd.map(p => {
+      const dm = {};
+      p.data.forEach(d => { dm[d.configAccount] = d.value; });
+      const point = { date: p.periodDate };
+      pattern.forEach(pat => {
+        const result = evalFormula(pat, dm);
+        // Extract a readable label from the pattern
+        const acc = pat.match(/[A-Z0-9]+/)?.[0] || pat;
+        const found = p.data.find(d => d.configAccount === acc);
+        const label = found?.configCategory || acc;
+        point[label] = parseFloat(Number(result).toFixed(2));
+      });
+      return point;
+    });
+  }
+  return [];
+}
+
+// ── Format x-axis label ───────────────────────────────────────────────────────
+function fmtDate(d, annualize) {
+  if (!d) return '';
+  if (annualize) return String(d).substring(0,4);
+  // d is a date string like "2025-03-01T00:00:00.000Z" or "March-2025"
+  if (String(d).includes('T')) {
+    const dt = new Date(d);
+    return dt.toLocaleDateString('en-US', { month:'short', year:'2-digit' });
+  }
+  return String(d);
+}
+
+// ── Chart components ──────────────────────────────────────────────────────────
+function GraphCard({ config, rawRows, companyName }) {
+  const { metric, type, chartType, annualize, pattern } = config;
+  if (!rawRows || rawRows.length === 0) return null;
+
+  const unit     = typeUnit(type);
+  const periodData = buildPeriodData(rawRows);
+  const chartData  = generateData(periodData, pattern, annualize);
+  if (!chartData || chartData.length === 0) return null;
+
+  const isMulti  = chartType === 'MULTIBAR';
+  const multiKeys = isMulti && chartData.length > 0
+    ? Object.keys(chartData[0]).filter(k => k !== 'date')
+    : [];
+
+  const CustomTick = (props) => {
+    const { x, y, payload } = props;
+    return (
+      <text x={x} y={y} textAnchor="end" fill="#8B8B8B" fontSize={11}>
+        <tspan x={x} dy="0.355em">{fmtValue(unit, payload.value)}</tspan>
+      </text>
+    );
+  };
+  const CustomXTick = (props) => {
+    const { x, y, payload, index } = props;
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text x={0} y={0} dy={16} textAnchor="end" fill="#8B8B8B" transform="rotate(-35)" fontSize={11}>
+          {fmtDate(chartData[index]?.date, annualize)}
+        </text>
+      </g>
+    );
+  };
+  const TT = ({ active, payload }) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div style={{ background:'#fff', border:'1px solid #dde', borderRadius:6, padding:'8px 12px', fontSize:12 }}>
+        <div style={{ fontWeight:700, marginBottom:4 }}>
+          {fmtDate(payload[0]?.payload?.date, annualize)}
         </div>
-        <div style={{ width: 44, height: 44, borderRadius: 10, background: `${color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Icon size={22} color={color} />
-        </div>
+        {payload.map((p,i) => (
+          <div key={i} style={{ color: p.color || C.primary }}>
+            {isMulti ? `${p.name}: ${fmtValue(unit, p.value)}` : fmtValue(unit, p.value)}
+          </div>
+        ))}
       </div>
-    </div>
-  );
-}
-
-export default function Analytics() {
-  const { user } = useAuthStore();
-  const companyId = user?.companyId;
-  const today = new Date();
-  const ninetyDaysAgo = new Date(today);
-  ninetyDaysAgo.setDate(today.getDate() - 90);
-  const startDate = ninetyDaysAgo.toISOString().split('T')[0];
-  const endDate = today.toISOString().split('T')[0];
-
-  const loginQuery = useQuery({
-    queryKey: ['analyticsLogin', companyId],
-    queryFn: () => api.getReport({ _reportType: 'LOGIN', companyId, startDate, endDate, filterType: 'WEEK' }),
-    select: (res) => res.data?.result || res.data?.data || [],
-    enabled: !!companyId,
-  });
-
-  const participationQuery = useQuery({
-    queryKey: ['analyticsParticipation', companyId],
-    queryFn: () => api.getReport({ _reportType: 'PARTICIPATION', companyId, startDate, endDate, filterType: 'WEEK' }),
-    select: (res) => res.data?.result || res.data?.data || [],
-    enabled: !!companyId,
-  });
-
-  const analyticsCompanyQuery = useQuery({
-    queryKey: ['analyticsCompany', companyId],
-    queryFn: () => api.getAnalyticsCompany({ action: 'GET', companyId }),
-    select: (res) => res.data?.result || res.data?.companies || [],
-    enabled: !!companyId,
-  });
-
-  const loginData = loginQuery.data || [];
-  const participationData = participationQuery.data || [];
-  const companies = analyticsCompanyQuery.data || [];
-
-  // Merge line chart data by date
-  const dateMap = {};
-  loginData.forEach(d => { dateMap[d.reportDate] = { ...(dateMap[d.reportDate] || {}), date: d.reportDate, logins: d.count }; });
-  participationData.forEach(d => { dateMap[d.reportDate] = { ...(dateMap[d.reportDate] || {}), date: d.reportDate, participants: d.count }; });
-  const trendData = Object.values(dateMap).sort((a, b) => new Date(a.date) - new Date(b.date));
-
-  const totalLogins = loginData.reduce((s, d) => s + (Number(d.count) || 0), 0);
-  const totalParticipation = participationData.reduce((s, d) => s + (Number(d.count) || 0), 0);
-  const trackedUsers = [...new Set(loginData.map(d => d.entityId).filter(Boolean))].length;
-  const enabledCompanies = companies.filter(c => c.enabled || c.isEnabled).length;
-  const disabledCompanies = companies.length - enabledCompanies;
-
-  const pieDataCompany = [
-    { name: 'Enabled', value: enabledCompanies },
-    { name: 'Disabled', value: disabledCompanies },
-  ].filter(d => d.value > 0);
-
-  const pieDataActivity = [
-    { name: 'Logins', value: totalLogins },
-    { name: 'Participation', value: totalParticipation },
-  ].filter(d => d.value > 0);
-
-  const formatDate = (str) => {
-    if (!str) return '';
-    return new Date(str).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    );
   };
 
-  const isLoading = loginQuery.isLoading || participationQuery.isLoading || analyticsCompanyQuery.isLoading;
+  const margin = { top:8, right:20, left:20, bottom:55 };
+  const W = 440, H = 260;
 
   return (
-    <div style={{ padding: 32, maxWidth: 1200, margin: '0 auto' }}>
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: C.text }}>Analytics</h1>
-        <p style={{ margin: '4px 0 0', color: C.text2, fontSize: 14 }}>90-day platform overview</p>
+    <div style={{ background:'#F8FCFF', borderRadius:10, margin:12, padding:'12px 8px',
+                  boxShadow:'0 1px 4px rgba(0,0,0,0.07)', width:'calc(50% - 24px)', boxSizing:'border-box' }}>
+      <div style={{ fontSize:15, fontWeight:600, color:'#68B9DE', marginBottom:8, paddingLeft:16 }}>
+        {companyName} — {metric}
+      </div>
+      <ResponsiveContainer width="100%" height={H}>
+        {chartType === 'LINE' ? (
+          <LineChart data={chartData} margin={margin}>
+            <CartesianGrid strokeDasharray="3 3"/>
+            <XAxis dataKey="date" tick={<CustomXTick/>} interval={0}/>
+            <YAxis tick={<CustomTick/>}/>
+            <Tooltip content={<TT/>}/>
+            <Line type="monotone" dataKey="value" stroke={C.primary} strokeWidth={2} dot={{ r:3 }} isAnimationActive={false}/>
+          </LineChart>
+        ) : isMulti ? (
+          <BarChart data={chartData} margin={margin}>
+            <CartesianGrid strokeDasharray="3 3"/>
+            <XAxis dataKey="date" tick={<CustomXTick/>} interval={0}/>
+            <YAxis tick={<CustomTick/>}/>
+            <Tooltip content={<TT/>}/>
+            <Legend wrapperStyle={{ fontSize:11 }}/>
+            {multiKeys.map((k,i) => (
+              <Bar key={k} dataKey={k} fill={BAR_COLORS[i % BAR_COLORS.length]} isAnimationActive={false}/>
+            ))}
+          </BarChart>
+        ) : (
+          <BarChart data={chartData} margin={margin}>
+            <CartesianGrid strokeDasharray="3 3"/>
+            <XAxis dataKey="date" tick={<CustomXTick/>} interval={0}/>
+            <YAxis tick={<CustomTick/>}/>
+            <Tooltip content={<TT/>}/>
+            <Bar dataKey="value" fill={C.primary} radius={[3,3,0,0]} isAnimationActive={false}/>
+          </BarChart>
+        )}
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+export default function Analytics() {
+  const { user, token } = useAuthStore();
+  const companyId = user?.companyId;
+  const tok = typeof token === 'function' ? token() : token;
+
+  const [companies,         setCompanies]         = useState([]);
+  const [primaryCompanies,  setPrimaryCompanies]  = useState([]);
+  const [comparisonCompanies, setComparisonCompanies] = useState([]);
+  const [periods,           setPeriods]           = useState([]);
+  const [years,             setYears]             = useState([]);
+  const [pCompany,          setpCompany]          = useState(null);
+  const [cCompany,          setcCompany]          = useState(null);
+  const [pName,             setpName]             = useState('');
+  const [cName,             setcName]             = useState('');
+  const [graphData,         setGraphData]         = useState(null);
+  const [compGraphData,     setCompGraphData]     = useState(null);
+  const [loading,           setLoading]           = useState(true);
+
+  function http(url, data) {
+    return axios.post(BASE + url, data,
+      { headers: { Authorization: `Bearer ${tok}` } });
+  }
+
+  // Load companies on mount
+  useEffect(() => {
+    if (!companyId) return;
+    (async () => {
+      try {
+        const r = await http('/analyticsCompany', { action:'GET', companyId });
+        const list = r.data?.results || [];
+        if (list.length === 0) { setLoading(false); return; }
+
+        // Split into primary (mapped to this companyId) vs comparison
+        const idx = list.findIndex(c => c.rc_primaryCompanyId === Number(companyId));
+        let pri, comp;
+        if (idx !== -1) {
+          pri  = [list[idx]];
+          comp = list.filter((_,i) => i !== idx);
+        } else {
+          pri  = list;
+          comp = list.slice(1);
+        }
+        setPrimaryCompanies(pri);
+        setComparisonCompanies(comp);
+
+        const firstPri = pri[0];
+        setpCompany(firstPri.rc_companyId);
+        setpName(firstPri.rc_name);
+        await loadPeriods(firstPri.rc_companyId);
+      } catch(e) {
+        console.error('Analytics load error:', e);
+        setLoading(false);
+      }
+    })();
+  }, [companyId]);
+
+  const loadPeriods = async (rcCompanyId) => {
+    const r = await http('/analyticsCompany', { action:'GETPERIOD', reportCompanyId: rcCompanyId });
+    const list = r.data?.results || [];
+    setPeriods(list);
+    if (list.length > 0) {
+      const defaultYears = list.slice(0,3).map(p => String(p.rp_peroidYear));
+      setYears(defaultYears);
+      // years state triggers data load via effect below
+      return defaultYears;
+    }
+    setLoading(false);
+    return [];
+  };
+
+  // Load data whenever pCompany + years change
+  useEffect(() => {
+    if (!pCompany || years.length === 0) return;
+    (async () => {
+      setLoading(true);
+      try {
+        const r = await http('/analyticsData', { action:'GET', companyId: pCompany, years: years.join(',') });
+        const raw = r.data?.results?.[0] || [];
+        setGraphData(raw);
+      } catch { setGraphData(null); }
+      finally { setLoading(false); }
+    })();
+  }, [pCompany, years]);
+
+  const handlecCompany = async (e) => {
+    const val = e.target.value ? Number(e.target.value) : null;
+    const found = comparisonCompanies.find(c => c.rc_companyId === val);
+    setcCompany(val);
+    setcName(found?.rc_name || '');
+    if (!val) { setCompGraphData(null); return; }
+    try {
+      const r = await http('/analyticsData', { action:'GET', companyId: val, years: years.join(',') });
+      setCompGraphData(r.data?.results?.[0] || null);
+    } catch { setCompGraphData(null); }
+  };
+
+  const handlePeriod = (e) => {
+    const selected = [];
+    for (const opt of e.target.selectedOptions) selected.push(opt.value);
+    if (selected.length > 0) setYears(selected);
+  };
+
+  const handlePrimaryChange = async (e) => {
+    const val = Number(e.target.value);
+    const found = primaryCompanies.find(c => c.rc_companyId === val);
+    setpCompany(val);
+    setpName(found?.rc_name || '');
+    setCompGraphData(null);
+    setcCompany(null);
+    const newYears = await loadPeriods(val);
+    if (newYears.length > 0) setYears(newYears);
+  };
+
+  const isAdmin = Number(companyId) === 2;
+
+  return (
+    <div style={{ background:C.bg, minHeight:'100vh', padding:'0 0 40px' }}>
+      {/* Header bar */}
+      <div style={{ padding:'16px 24px', background:C.surface, borderBottom:`1px solid ${C.border}`,
+                    display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:20, flexWrap:'wrap' }}>
+          {isAdmin && primaryCompanies.length > 0 && (
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <label style={{ fontSize:13, fontWeight:600, color:C.text2, marginBottom:0 }}>Primary Company:</label>
+              <select value={pCompany || ''} onChange={handlePrimaryChange}
+                style={{ padding:'5px 10px', border:`1px solid ${C.border}`, borderRadius:6, fontSize:13 }}>
+                {primaryCompanies.map((c,i) => (
+                  <option key={i} value={c.rc_companyId}>{c.rc_name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {isAdmin && comparisonCompanies.length > 0 && (
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <label style={{ fontSize:13, fontWeight:600, color:C.text2, marginBottom:0 }}>Compare With:</label>
+              <select value={cCompany || ''} onChange={handlecCompany}
+                style={{ padding:'5px 10px', border:`1px solid ${C.border}`, borderRadius:6, fontSize:13 }}>
+                <option value="">— None —</option>
+                {comparisonCompanies.map((c,i) => (
+                  <option key={i} value={c.rc_companyId}>{c.rc_name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {periods.length > 0 && (
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <label style={{ fontSize:13, fontWeight:600, color:C.text2, marginBottom:0 }}>Year:</label>
+              <select multiple value={years} onChange={handlePeriod}
+                size={Math.min(periods.length, 5)}
+                style={{ padding:'5px 8px', border:`1px solid ${C.border}`, borderRadius:6, fontSize:13,
+                         minWidth:80 }}>
+                {periods.map((p,i) => (
+                  <option key={i} value={p.rp_peroidYear}>{p.rp_peroidYear}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <a href="https://docs.google.com/document/d/15_9eL_pYlEh2ZHhq-1kLm_eNlvIj01ZrYUrMy8bhK_w/edit?usp=sharing"
+            target="_blank" rel="noreferrer"
+            style={{ color:C.primary, display:'flex', alignItems:'center', gap:4, fontSize:13 }}>
+            <Info size={16}/> Metrics Guide
+          </a>
+        </div>
+
+        <div style={{ fontSize:22, color:C.text2, fontWeight:300 }}>Analytics</div>
       </div>
 
-      {isLoading && <Spinner />}
-
-      {!isLoading && (
-        <>
-          {/* KPI Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 28 }}>
-            <KPICard label="Total Logins (90d)" value={totalLogins} icon={TrendingUp} color={C.primary} />
-            <KPICard label="Tracked Users" value={trackedUsers || loginData.length} icon={Users} color={C.success} />
-            <KPICard label="Tracked Companies" value={companies.length} icon={Building} color={C.warning} />
-            <KPICard
-              label="Participation Rate"
-              value={totalLogins > 0 ? `${Math.round((totalParticipation / totalLogins) * 100)}%` : '—'}
-              icon={Activity}
-              color='#EC4899'
-            />
-          </div>
-
-          {/* Trend Line Chart */}
-          {trendData.length > 0 && (
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 24, marginBottom: 24 }}>
-              <h3 style={{ margin: '0 0 20px', fontSize: 15, fontWeight: 600, color: C.text }}>Weekly Trend</h3>
-              <ResponsiveContainer width="100%" height={260}>
-                <LineChart data={trendData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
-                  <XAxis dataKey="date" tickFormatter={formatDate} tick={{ fontSize: 11, fill: C.text2 }} />
-                  <YAxis tick={{ fontSize: 11, fill: C.text2 }} allowDecimals={false} />
-                  <Tooltip labelFormatter={v => formatDate(v)} contentStyle={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }} />
-                  <Legend wrapperStyle={{ fontSize: 13 }} />
-                  <Line type="monotone" dataKey="logins" stroke={C.primary} strokeWidth={2} dot={false} name="Logins" />
-                  <Line type="monotone" dataKey="participants" stroke={C.success} strokeWidth={2} dot={false} name="Participants" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginBottom: 24 }}>
-            {/* Bar Chart: Top Companies */}
-            {companies.length > 0 && (
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 24, gridColumn: 'span 1' }}>
-                <h3 style={{ margin: '0 0 20px', fontSize: 15, fontWeight: 600, color: C.text }}>Companies</h3>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={companies.slice(0, 8)}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
-                    <XAxis dataKey="companyName" tick={{ fontSize: 10, fill: C.text2 }} />
-                    <YAxis tick={{ fontSize: 11, fill: C.text2 }} allowDecimals={false} />
-                    <Tooltip contentStyle={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }} />
-                    <Bar dataKey="userCount" fill={C.primary} radius={[3, 3, 0, 0]} name="Users" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-
-            {/* Pie: Enabled/Disabled */}
-            {pieDataCompany.length > 0 && (
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 24 }}>
-                <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 600, color: C.text }}>Company Status</h3>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie data={pieDataCompany} cx="50%" cy="50%" outerRadius={70} dataKey="value" label={({ name, value }) => `${name}: ${value}`} labelLine={false}>
-                      {pieDataCompany.map((_, i) => <Cell key={i} fill={PIE_COLORS[i]} />)}
-                    </Pie>
-                    <Tooltip contentStyle={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-
-            {/* Pie: Login vs Participation */}
-            {pieDataActivity.length > 0 && (
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 24 }}>
-                <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 600, color: C.text }}>Activity Split</h3>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie data={pieDataActivity} cx="50%" cy="50%" outerRadius={70} dataKey="value" label={({ name, value }) => `${name}: ${value}`} labelLine={false}>
-                      {pieDataActivity.map((_, i) => <Cell key={i} fill={[C.primary, C.success][i]} />)}
-                    </Pie>
-                    <Tooltip contentStyle={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
-
-          {/* Company Registry Table */}
-          {companies.length > 0 && (
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
-              <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}` }}>
-                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: C.text }}>Company Registry</h3>
-              </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: C.bg }}>
-                      {Object.keys(companies[0] || {}).slice(0, 8).map(col => (
-                        <th key={col} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: C.text2, textTransform: 'uppercase', letterSpacing: 0.5, whiteSpace: 'nowrap' }}>
-                          {col}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {companies.map((c, i) => (
-                      <tr key={i} style={{ borderTop: `1px solid ${C.border}` }}
-                        onMouseEnter={e => e.currentTarget.style.background = C.bg}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                      >
-                        {Object.values(c).slice(0, 8).map((val, j) => (
-                          <td key={j} style={{ padding: '12px 16px', fontSize: 13, color: C.text, whiteSpace: 'nowrap' }}>
-                            {typeof val === 'boolean' ? (
-                              <span style={{
-                                padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600,
-                                background: val ? '#D1FAE5' : '#FEE2E2',
-                                color: val ? '#065F46' : '#991B1B',
-                              }}>
-                                {val ? 'Yes' : 'No'}
-                              </span>
-                            ) : String(val ?? '')}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </>
+      {/* Charts grid */}
+      {loading ? (
+        <div style={{ display:'flex', justifyContent:'center', padding:80 }}>
+          <Loader2 size={36} color={C.primary} style={{ animation:'spin 1s linear infinite' }}/>
+          <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+        </div>
+      ) : !graphData || graphData.length === 0 ? (
+        <div style={{ textAlign:'center', padding:80 }}>
+          <h2 style={{ color:C.text2 }}>No Records Found</h2>
+          <p style={{ color:C.text2, fontSize:14 }}>
+            Select a primary company and at least one year to view analytics.
+          </p>
+        </div>
+      ) : (
+        <div style={{ display:'flex', flexWrap:'wrap', padding:'16px 12px' }}>
+          {GRAPH_DETAILS.map((cfg, i) => (
+            <GraphCard key={i} config={cfg} rawRows={graphData} companyName={pName}/>
+          ))}
+          {compGraphData && compGraphData.length > 0 && GRAPH_DETAILS.map((cfg, i) => (
+            <GraphCard key={`c${i}`} config={cfg} rawRows={compGraphData} companyName={cName}/>
+          ))}
+        </div>
       )}
     </div>
   );

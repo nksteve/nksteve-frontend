@@ -87,8 +87,10 @@ export const getNotification = (data) => http.post('/getNotification', data);
 export const getEntityDisplayActivity = (data) => http.post('/getEntityDisplayActivity', data);
 
 // ThoughtPad
-export const getThoughtpad = (data) => http.post('/getThoughtpad', data);
-export const updateThoughtpad = (data) => http.post('/updateThoughtpad', data);
+export const getThoughtpad    = (data) => http.post('/getThoughtpads',    data);
+export const updateThoughtpad = (data) => http.post('/updateThoughtpad',  data);
+export const insertThoughtpad = (data) => http.post('/insertThoughtpad',  data);
+export const deleteThoughtpad = (data) => http.post('/deleteThoughtpad',  data);
 
 // Tags & Picklist
 export const getCategories = () => http.get('/getCategories');
