@@ -1518,8 +1518,8 @@ export default function WorkPlan() {
             {/* Gauge + progress bar — fills remaining space */}
             <Speedometer percent={percent} />
 
-            {/* Right action buttons — matches vembu (Mark Complete, Create Template, View Activity Log) */}
-            <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+            {/* Right action buttons — only visible to plan owner (allowAccess=EDIT) */}
+            {plan.allowAccess === 'EDIT' && <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
               {plan.statusId === 2
                 ? <button
                     onClick={() => markCompleteMutation.mutate(1)}
@@ -1541,7 +1541,7 @@ export default function WorkPlan() {
                 onClick={() => navigate('/reporting')}
                 style={{ padding: '7px 14px', background: C.teal, color: '#fff', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
               >View Activity Log</button>
-            </div>
+            </div>}
           </div>
         </div>
 
@@ -1571,8 +1571,8 @@ export default function WorkPlan() {
             </div>
           </label>
 
-          {/* Add New Goal */}
-          <button
+          {/* Add New Goal — only for plan owner/editor */}
+          {plan.allowAccess === 'EDIT' && <button
             onClick={() => setShowGoalModal(true)}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
@@ -1582,7 +1582,7 @@ export default function WorkPlan() {
             }}
           >
             <Plus size={13} /> Add New Goal
-          </button>
+          </button>}
 
           <div style={{ flex: 1 }} />
 
