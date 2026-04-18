@@ -246,8 +246,8 @@ function DecisionIcon({ color, active }) {
 }
 
 /* ─── Yellow square dot (vembu uses a yellow square, not circle) ─────────────── */
-function YellowDot() {
-  return <div style={{ width: 12, height: 12, background: '#ffc107', borderRadius: 2, flexShrink: 0 }} />;
+function YellowDot({ style }) {
+  return <div style={{ width: 12, height: 12, background: '#ffc107', borderRadius: 2, flexShrink: 0, ...style }} />;
 }
 
 /* ─── Goal header row — purple band matching vembu ─────────────────────────── */
@@ -279,12 +279,9 @@ function GoalRow({ goal, goalActions, onChartClick, onDecisionClick, onNoteClick
           width: '100%',
           boxSizing: 'border-box',
         }}>
-          {/* Yellow square — shown when goalFeedbackStatus === 0 (HeadsUp pending) */}
-          {hasHeadsUp && <YellowDot />}
           <span style={{
             flex: 1,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            marginLeft: hasHeadsUp ? 4 : 0,
           }}>
             {goal.goalName || '—'}
           </span>
@@ -329,9 +326,10 @@ function GoalRow({ goal, goalActions, onChartClick, onDecisionClick, onNoteClick
         />
       </td>
 
-      {/* % */}
-      <td style={{ padding: '0 6px', width: 60, textAlign: 'right', fontSize: 13, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>
+      {/* % + yellow square on right if HeadsUp pending */}
+      <td style={{ padding: '0 6px', width: 60, textAlign: 'right', fontSize: 13, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', position: 'relative' }}>
         {pct.toFixed(1)}%
+        {hasHeadsUp && <YellowDot style={{ position: 'absolute', top: '50%', right: -2, transform: 'translateY(-50%)' }} />}
       </td>
 
       {/* Due date */}
@@ -368,13 +366,10 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
           width: '100%',
           boxSizing: 'border-box',
         }}>
-          {/* Yellow square — shown when actionFeedbackStatus === 0 (HeadsUp pending) */}
-          {hasHeadsUp && <YellowDot />}
           <span style={{
             fontSize: 12.5, color: C.text,
             flex: 1,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            marginLeft: hasHeadsUp ? 4 : 0,
           }}>
             {action.actionName || '—'}
           </span>
@@ -426,9 +421,10 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
         />
       </td>
 
-      {/* % — tracks local slider position */}
-      <td style={{ padding: '0 6px', width: 60, textAlign: 'right', fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap' }}>
+      {/* % + yellow square on right if HeadsUp pending */}
+      <td style={{ padding: '0 6px', width: 60, textAlign: 'right', fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', position: 'relative' }}>
         {localPct.toFixed(1)}%
+        {hasHeadsUp && <YellowDot style={{ position: 'absolute', top: '50%', right: -2, transform: 'translateY(-50%)' }} />}
       </td>
 
       {/* Due date — date text if set, FA-style calendar icon if not (matches vembu) */}
