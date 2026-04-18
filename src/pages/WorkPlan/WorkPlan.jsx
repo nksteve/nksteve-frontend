@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import ReactSpeedometer from 'react-d3-speedometer';
 import SlickSlider from 'react-slick';
 import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
@@ -38,64 +39,41 @@ const C = {
   text2:   '#73818f',
 };
 
-/* ─── Speedometer — matches vembu: gauge centered, progress bar wide right ── */
+/* ─── Speedometer — matches vembu: react-d3-speedometer, minValue=-3, maxValue=8, 7 segments ── */
 function Speedometer({ percent = 0 }) {
   const p = Math.min(100, Math.max(0, Number(percent) || 0));
-  // SVG coords: Y-axis is DOWN. Angles measured CW from east (standard SVG).
-  // Gauge arc: from 225° to 315° (bottom-left to bottom-right) sweeping CW = 270° total
-  // In SVG: 225° CW from east = bottom-left, 315° CW from east = bottom-right
-  const cx = 85, cy = 80, r = 60;
-
-  function ptOnCircle(deg) {
-    const rad = (deg * Math.PI) / 180;
-    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
-  }
-
-  function arcPath(startDeg, endDeg, stroke, strokeW = 8) {
-    const s = ptOnCircle(startDeg);
-    const e = ptOnCircle(endDeg);
-    const sweep = ((endDeg - startDeg) + 360) % 360;
-    const large = sweep > 180 ? 1 : 0;
-    return (
-      <path
-        d={`M${s.x.toFixed(2)} ${s.y.toFixed(2)} A${r} ${r} 0 ${large} 1 ${e.x.toFixed(2)} ${e.y.toFixed(2)}`}
-        fill="none" stroke={stroke} strokeWidth={strokeW} strokeLinecap="round"
-      />
-    );
-  }
-
-  // Gauge arc: 225° to 315° CW (through 270° at bottom = 0, then up to top = 4, then down to bottom-right = 8)
-  // Segments matching vembu colors: red (225-255), yellow (255-285), green (285-315)
-  // Needle: maps 0% to 225°, 100% to 315° CW
-  const needleDeg = 225 + (p / 100) * 270;
-  const npt = ptOnCircle(needleDeg);
-  // shorten needle slightly
-  const needleLen = r * 0.78;
-  const needleRad = (needleDeg * Math.PI) / 180;
-  const nx = cx + needleLen * Math.cos(needleRad);
-  const ny = cy + needleLen * Math.sin(needleRad);
-
+  // Map 0-100% to -3..8 scale (same as vembu NIM scale)
+  const nimValue = -3 + (p / 100) * 11;
   const barColor = p < 50 ? C.orange : p < 80 ? '#e6a817' : '#0B6623';
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 0, flex: 1 }}>
-      {/* Gauge SVG — 150x110 viewBox to give room for labels below */}
-      <svg width={175} height={120} viewBox="0 0 170 115" style={{ flexShrink: 0 }}>
-        {/* grey full track */}
-        {arcPath(225, 315, '#e0e0e0')}
-        {/* colored segments: vembu red/yellow/green */}
-        {arcPath(225, 255, '#ef4444')}
-        {arcPath(255, 285, '#e6a817')}
-        {arcPath(285, 315, '#0B6623')}
-        {/* needle */}
-        <line x1={cx} y1={cy} x2={nx.toFixed(2)} y2={ny.toFixed(2)} stroke="#444" strokeWidth={2.5} strokeLinecap="round" />
-        <circle cx={cx} cy={cy} r={4.5} fill="#444" />
-        {/* tick labels */}
-        <text x={4}   y={108} fontSize={10} fill={C.text2} fontFamily="sans-serif">0</text>
-        <text x={78}  y={18}  fontSize={10} fill={C.text2} fontFamily="sans-serif">4</text>
-        <text x={152} y={108} fontSize={10} fill={C.text2} fontFamily="sans-serif">8</text>
-        <text x={66}  y={108} fontSize={10} fill={C.text2} fontFamily="sans-serif">{p.toFixed(0)}%</text>
-      </svg>
+      <div style={{ flexShrink: 0, width: 172, height: 120, overflow: 'hidden' }}>
+        <ReactSpeedometer
+          minValue={-3}
+          maxValue={8}
+          value={nimValue}
+          needleColor="black"
+          needleTransitionDuration={2000}
+          needleHeightRatio={0.7}
+          segments={7}
+          segmentColors={[
+            '#FE0F0D',
+            '#FF4311',
+            '#FF7B14',
+            '#FCA425',
+            '#DCB533',
+            '#9EB339',
+            '#6CB34B',
+          ]}
+          width={172}
+          height={120}
+          textColor="black"
+          currentValueText={`${p.toFixed(0)}%`}
+          ringWidth={10}
+          arcWidth={0.3}
+        />
+      </div>
       {/* Progress label + bar — fills remaining width */}
       <div style={{ flex: 1, paddingLeft: 14 }}>
         <div style={{ fontSize: 12, color: C.text2, marginBottom: 5, fontWeight: 500 }}>Progress</div>
@@ -282,16 +260,12 @@ function GoalRow({ goal, goalActions, onChartClick, onDecisionClick, onNoteClick
   const pct = Math.min(100, aggPct);
   const milestoneDate = goal.goalMilestoneDate || goal.milestoneDate;
   const bgcolor = C.purple; // vembu always uses purple for goal rows
+  const hasHeadsUp = goal.goalFeedbackStatus === 0;
 
   return (
     <tr style={{ background: bgcolor, height: 34 }}>
       {/* Left color stripe */}
       <td style={{ width: 4, background: bgcolor, padding: 0 }} />
-
-      {/* Checkbox only on left */}
-      <td style={{ padding: '0 4px', width: 24 }}>
-        <Checkbox />
-      </td>
 
       {/* Goal name box with note + folder icons on the RIGHT — matches vembu */}
       <td style={{ padding: '0 4px', width: 277 }}>
@@ -305,9 +279,12 @@ function GoalRow({ goal, goalActions, onChartClick, onDecisionClick, onNoteClick
           width: '100%',
           boxSizing: 'border-box',
         }}>
+          {/* Yellow square — shown when goalFeedbackStatus === 0 (HeadsUp pending) */}
+          {hasHeadsUp && <YellowDot />}
           <span style={{
             flex: 1,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            marginLeft: hasHeadsUp ? 4 : 0,
           }}>
             {goal.goalName || '—'}
           </span>
@@ -373,16 +350,12 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
   const [localPct, setLocalPct] = useState(pct);
   const endDate    = action.endDate || action.milestoneDate;
   const planColor  = themeColor || C.teal;
+  const hasHeadsUp = action.actionFeedbackStatus === 0;
 
   return (
     <tr style={{ background: '#fff', borderBottom: `1px solid ${C.border}`, height: 32 }}>
       {/* Left color stripe — thin colored border matching plan color */}
       <td style={{ width: 4, background: planColor, padding: 0 }} />
-
-      {/* Checkbox only on left */}
-      <td style={{ padding: '0 4px', width: 24 }}>
-        <Checkbox />
-      </td>
 
       {/* Action name box with note + folder icons on the RIGHT — matches vembu */}
       <td style={{ padding: '0 4px', width: 277 }}>
@@ -395,10 +368,13 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
           width: '100%',
           boxSizing: 'border-box',
         }}>
+          {/* Yellow square — shown when actionFeedbackStatus === 0 (HeadsUp pending) */}
+          {hasHeadsUp && <YellowDot />}
           <span style={{
             fontSize: 12.5, color: C.text,
             flex: 1,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            marginLeft: hasHeadsUp ? 4 : 0,
           }}>
             {action.actionName || '—'}
           </span>
@@ -455,14 +431,15 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
         {localPct.toFixed(1)}%
       </td>
 
-      {/* Due date / calendar icon */}
+      {/* Due date — date text if set, FA-style calendar icon if not (matches vembu) */}
       <td style={{ padding: '0 8px', width: 110, textAlign: 'right' }}>
         {endDate
           ? <span style={{ fontSize: 11.5, color: C.teal, fontWeight: 600 }}>
               {new Date(endDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
             </span>
-          : <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke={C.text2} strokeWidth={2} style={{ display: 'inline-block' }}>
-              <rect x={3} y={4} width={18} height={18} rx={2}/><line x1={16} y1={2} x2={16} y2={6}/><line x1={8} y1={2} x2={8} y2={6}/><line x1={3} y1={10} x2={21} y2={10}/>
+          : <svg viewBox="0 0 448 512" width={13} height={13} fill={C.text2} style={{ display: 'inline-block' }}>
+              {/* FA fa-calendar solid */}
+              <path d="M148 288h-40c-6.6 0-12-5.4-12-12v-40c0-6.6 5.4-12 12-12h40c6.6 0 12 5.4 12 12v40c0 6.6-5.4 12-12 12zm108-12v-40c0-6.6-5.4-12-12-12h-40c-6.6 0-12 5.4-12 12v40c0 6.6 5.4 12 12 12h40c6.6 0 12-5.4 12-12zm96 0v-40c0-6.6-5.4-12-12-12h-40c-6.6 0-12 5.4-12 12v40c0 6.6 5.4 12 12 12h40c6.6 0 12-5.4 12-12zm-96 96v-40c0-6.6-5.4-12-12-12h-40c-6.6 0-12 5.4-12 12v40c0 6.6 5.4 12 12 12h40c6.6 0 12-5.4 12-12zm-96 0v-40c0-6.6-5.4-12-12-12h-40c-6.6 0-12 5.4-12 12v40c0 6.6 5.4 12 12 12h40c6.6 0 12-5.4 12-12zm192 0v-40c0-6.6-5.4-12-12-12h-40c-6.6 0-12 5.4-12 12v40c0 6.6 5.4 12 12 12h40c6.6 0 12-5.4 12-12zm96-260v352c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V112c0-26.5 21.5-48 48-48h48V12c0-6.6 5.4-12 12-12h40c6.6 0 12 5.4 12 12v52h128V12c0-6.6 5.4-12 12-12h40c6.6 0 12 5.4 12 12v52h48c26.5 0 48 21.5 48 48zm-48 346V160H48v298c0 3.3 2.7 6 6 6h340c3.3 0 6-2.7 6-6z"/>
             </svg>
         }
       </td>
@@ -1095,7 +1072,7 @@ function GoalChartModal({ goal, goalActions, onClose, initialTab = 'chart', grow
                 </thead>
                 <tbody>
                   {goalActions.length === 0 && (
-                    <tr><td colSpan={4} style={{ padding: 16, textAlign: 'center', color: C.text2, fontSize: 13 }}>No actions yet.</td></tr>
+                    <tr><td colSpan={3} style={{ padding: 16, textAlign: 'center', color: C.text2, fontSize: 13 }}>No actions yet.</td></tr>
                   )}
                   {goalActions.map((a, i) => {
                     const p = Math.min(100, Number(a.actionGoalPercentAchieve || 0));
@@ -1538,8 +1515,7 @@ export default function WorkPlan() {
         <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: 4 }} />
-            <col style={{ width: 24 }} />
-            <col style={{ width: 277 }} />
+            <col style={{ width: 301 }} />
             <col style={{ width: 64 }} />
             <col />
             <col style={{ width: 66 }} />
