@@ -104,6 +104,27 @@ export const getTraining = (data) => http.post('/training', data);
 export const deleteTraining = (data) => http.post('/deleteTrainingdoc', data);
 export const updateTrainingCategory = (data) => http.post('/trainingCategory', data);
 
+// Cron Management
+export const cronSettings = (data) => http.post('/cronsettings', data);
+
+// SFTP Management
+export const sftpAdmin = (data) => http.post('/sftpAdmin', data);
+export const sftpUser = (data) => http.post('/sftpUser', data);
+export const createSftpUser = (data) => http.post('/createSftpUser', data);
+
+// Company Management
+export const getCompanyList = (data) => http.post('/getPicklist', data);
+export const companyAction = (data) => http.post('/company', data);
+export const uploadCompanyFile = (data) => http.post('/company/upload', data);
+
+// Training (new granular routes)
+export const trainingTabs = (data) => http.post('/training/tabs', data);
+export const trainingList = (data) => http.post('/training/list', data);
+export const trainingPlans = (data) => http.post('/training/plans', data);
+export const trainingSave = (data, config) => http.post('/training/save', data, config);
+export const trainingDelete = (data) => http.post('/training/delete', data);
+export const trainingCategory = (data) => http.post('/training/category', data);
+
 // Preferences
 export const updatePreferences = (data) => http.post('/preferences', data);
 
