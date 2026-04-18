@@ -1514,30 +1514,7 @@ export default function WorkPlan() {
             {/* Gauge + progress bar — fills remaining space */}
             <Speedometer percent={percent} />
 
-            {/* Right action buttons — only visible to plan owner (allowAccess=EDIT) */}
-            {plan.allowAccess === 'EDIT' && <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
-              {plan.statusId === 2
-                ? <button
-                    onClick={() => markCompleteMutation.mutate(1)}
-                    disabled={markCompleteMutation.isPending}
-                    style={{ padding: '7px 14px', background: C.teal, color: '#fff', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
-                  >Restore Goal Plan</button>
-                : <button
-                    onClick={() => markCompleteMutation.mutate(2)}
-                    disabled={markCompleteMutation.isPending}
-                    style={{ padding: '7px 14px', background: C.teal, color: '#fff', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
-                  >Mark Growth Plan Complete</button>
-              }
-              <button
-                onClick={() => createTemplateMutation.mutate()}
-                disabled={createTemplateMutation.isPending}
-                style={{ padding: '7px 14px', background: '#888', color: '#fff', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
-              >Create Template</button>
-              <button
-                onClick={() => navigate('/reporting')}
-                style={{ padding: '7px 14px', background: C.teal, color: '#fff', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
-              >View Activity Log</button>
-            </div>}
+            {/* Right action buttons — removed to match Vembu original (these are commented out in Vembu's GrowthHeader.js) */}
           </div>
         </div>
 
