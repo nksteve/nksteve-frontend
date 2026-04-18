@@ -260,7 +260,7 @@ function GoalRow({ goal, goalActions, onChartClick, onDecisionClick, onNoteClick
   const pct = Math.min(100, aggPct);
   const milestoneDate = goal.goalMilestoneDate || goal.milestoneDate;
   const bgcolor = C.purple; // vembu always uses purple for goal rows
-  const hasHeadsUp = goal.goalFeedbackStatus !== 1;
+  const hasHeadsUp = goal.goalFeedbackStatus === 0;
 
   return (
     <tr style={{ background: bgcolor, height: 34 }}>
@@ -350,7 +350,7 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
   const [localPct, setLocalPct] = useState(pct);
   const endDate    = action.endDate || action.milestoneDate;
   const planColor  = themeColor || C.teal;
-  const hasHeadsUp = action.actionFeedbackStatus !== 1;
+  const hasHeadsUp = action.actionFeedbackStatus === 0;
 
   return (
     <tr style={{ background: '#fff', borderBottom: `1px solid ${C.border}`, height: 32 }}>
@@ -1007,6 +1007,125 @@ function DecisionTab({ goal, growthPlanId, entityId }) {
   );
 }
 
+/* ─── HeadsUp Tab ─────────────────────────────────────────────────────────────────────── */
+function HeadsUpTab({ goal, growthPlanId, entityId, onRefresh }) {
+  const goalTagId  = goal?.goalTagId || goal?.goalId || null;
+  // Plan-level: HeadsUp is per-plan, not per-action in this modal context
+  // Use existing feedback fields from goal object if available
+  const [text,    setText]    = useState(goal?.actionFeedback || goal?.goalFeedback || '');
+  const [saving,  setSaving]  = useState(false);
+  const [status,  setStatus]  = useState(
+    goal?.actionFeedbackStatus != null ? goal.actionFeedbackStatus
+    : goal?.goalFeedbackStatus  != null ? goal.goalFeedbackStatus
+    : null
+  );
+  const firstName  = goal?.actionFeedbackFirstName  || goal?.goalFeedbackFirstName  || '';
+  const lastName   = goal?.actionFeedbackLastName   || goal?.goalFeedbackLastName   || '';
+  const lastDate   = goal?.actionFeedbackLastUpdatedDate || goal?.goalFeedbackLastUpdatedDate || null;
+
+  const handleSave = async () => {
+    if (!text.trim()) { toast.warning('Enter your comment'); return; }
+    setSaving(true);
+    try {
+      await api.updateActionFeedback({
+        action: 'UPDATE',
+        teamId: String(growthPlanId),
+        goalTagId,
+        actionTagId: null,
+        actionFeedback: text,
+        entityId,
+        actionFeedbackStatus: null,
+      });
+      toast.success('HeadsUp saved');
+      setStatus(0);
+      onRefresh && onRefresh();
+    } catch (e) {
+      toast.error('Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleThumb = async () => {
+    setSaving(true);
+    try {
+      const newStatus = status === 1 ? 0 : 1;
+      await api.updateActionFeedback({
+        action: 'UPDATESTATUS',
+        teamId: String(growthPlanId),
+        goalTagId,
+        actionTagId: null,
+        actionFeedback: null,
+        entityId,
+        actionFeedbackStatus: newStatus,
+      });
+      setStatus(newStatus);
+      onRefresh && onRefresh();
+    } catch (e) {
+      toast.error('Failed to update status');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ padding: 16 }}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: '#752b8d', marginBottom: 12 }}>HeadsUP</div>
+      <textarea
+        value={text}
+        onChange={e => setText(e.target.value)}
+        placeholder="Maximum 120 characters"
+        maxLength={120}
+        style={{
+          width: '100%', padding: 10, border: `1px solid ${C.border}`,
+          borderRadius: 4, fontSize: 13, resize: 'vertical',
+          minHeight: 80, boxSizing: 'border-box', outline: 'none',
+        }}
+      />
+      {/* Last editor name + date */}
+      <div style={{ marginTop: 8, fontSize: 13, color: C.text }}>
+        {firstName && (
+          <span style={{ fontWeight: 700 }}>{firstName} {lastName}</span>
+        )}
+        {lastDate && (
+          <span style={{ marginLeft: 16, fontWeight: 700 }}>
+            {new Date(lastDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
+          </span>
+        )}
+      </div>
+      {/* Thumb (when status=0) OR Save button (when status !== 0) — matches Vembu */}
+      <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12, position: 'relative', minHeight: 36 }}>
+        {status === 0 && (
+          <button
+            onClick={handleThumb}
+            disabled={saving}
+            title="Acknowledge HeadsUp"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, position: 'absolute', left: 220 }}
+          >
+            {/* fa-thumbs-up SVG */}
+            <svg viewBox="0 0 512 512" width={28} height={28} fill="#28a745">
+              <path d="M104 224H24c-13.3 0-24 10.7-24 24v240c0 13.3 10.7 24 24 24h80c13.3 0 24-10.7 24-24V248c0-13.3-10.7-24-24-24zM64 472c-13.3 0-24-10.7-24-24s10.7-24 24-24 24 10.7 24 24-10.7 24-24 24zM384 81.5c0 42.4-26 66.2-33.3 94.5H464c26.5 0 48 21.5 48 48 0 18.5-10.5 34.6-26.1 43 15.1 8.8 25.1 25.6 24.1 44.6-1.7 27.5-23.9 49.4-51.4 49.4H448c1.5 6.3 2.2 12.8 2.2 19.4 0 23.4-10.7 45.8-29.1 60.9-16.6 13.6-37.3 19.4-58.6 17.2H192V112c0-1.8.5-3.5 1.4-5l80.7-80.7C292.5 7.4 322.1 0 343.6 0 365.3 0 384 16.5 384 36.1v45.4z"/>
+            </svg>
+          </button>
+        )}
+        {status !== 0 && (
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={{
+              padding: '6px 18px', background: '#752b8d', color: '#fff',
+              border: 'none', borderRadius: 4, cursor: 'pointer',
+              fontSize: 12, fontWeight: 600,
+            }}
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function GoalChartModal({ goal, goalActions, onClose, initialTab = 'chart', growthPlanId, entityId }) {
   const [modalTab, setModalTab] = useState(initialTab);
 
@@ -1102,17 +1221,7 @@ function GoalChartModal({ goal, goalActions, onClose, initialTab = 'chart', grow
             <DecisionTab goal={goal} growthPlanId={growthPlanId} entityId={entityId} />
           )}
           {modalTab === 'headsup' && (
-            <div style={{ padding: 8 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 10 }}>HeadsUP</div>
-              <textarea
-                placeholder="Maximum 120 characters"
-                maxLength={120}
-                style={{ width: '100%', padding: 10, border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 13, resize: 'vertical', minHeight: 80, boxSizing: 'border-box' }}
-              />
-              <button style={{ marginTop: 8, padding: '7px 18px', background: C.teal, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>
-                Save
-              </button>
-            </div>
+            <HeadsUpTab goal={goal} growthPlanId={growthPlanId} entityId={entityId} onRefresh={onClose} />
           )}
         </div>
       </div>

@@ -138,4 +138,5 @@ export const updateEntityActivity = (data) => http.post('/updateEntityActivity',
 export default http;
 
 // Decision Making
-export const decisionMaking = (data) => http.post('/decisionMaking', data);
+export const decisionMaking          = (data) => http.post('/decisionMaking', data);
+export const updateActionFeedback    = (data) => http.post('/updateActionFeedback', data);
