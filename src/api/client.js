@@ -69,6 +69,7 @@ export const deleteUser = (data) => http.post('/deleteUserByEntityId', data);
 export const getAllContributors = (data) => http.post('/cgp_getAllContributors', data);
 export const getEntityOrgReporting = (data) => http.post('/getEntityOrgReporting', data);
 export const getEntityActivityLog = (data) => http.post('/getEntityActivityLog', data);
+export const getEntityActivity    = (data) => http.post('/getEntityActivity', data);
 export const updateCompany = (data) => http.post('/updateCompany', data);
 
 // Reports & Analytics

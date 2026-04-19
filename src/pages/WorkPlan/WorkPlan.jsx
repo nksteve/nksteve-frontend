@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import ReactSpeedometer from 'react-d3-speedometer';
 import SlickSlider from 'react-slick';
 import 'slick-carousel/slick/slick.css';
@@ -251,7 +251,7 @@ function YellowDot() {
 }
 
 /* ─── Goal header row — purple band matching vembu ─────────────────────────── */
-function GoalRow({ goal, goalActions, onChartClick, onDecisionClick, onNoteClick, onFileClick }) {
+function GoalRow({ goal, goalActions, onChartClick, onDecisionClick, onNoteClick, onNotePopoverClick, onFileClick }) {
   // Aggregate % from actions (average of actionGoalPercentAchieve)
   const actionPcts = goalActions.map(a => Number(a.actionGoalPercentAchieve || 0));
   const aggPct     = actionPcts.length > 0
@@ -286,7 +286,11 @@ function GoalRow({ goal, goalActions, onChartClick, onDecisionClick, onNoteClick
             {goal.goalName || '—'}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 4 }}>
-            <button onClick={onNoteClick} title="Notes" style={{ background:'none',border:'none',cursor:'pointer',padding:0,position:'relative',display:'flex' }}>
+            <button
+              onClick={e => (onNotePopoverClick || onNoteClick)(e)}
+              title="Notes / History / Activity Log"
+              style={{ background:'none',border:'none',cursor:'pointer',padding:0,position:'relative',display:'flex' }}
+            >
               <NoteIcon color={goal.notesCount > 0 ? C.teal : '#adb5bd'} hasNotes={goal.notesCount > 0} />
             </button>
             <button onClick={onFileClick} title="Files" style={{ background:'none',border:'none',cursor:'pointer',padding:0,position:'relative',display:'flex' }}>
@@ -343,7 +347,7 @@ function GoalRow({ goal, goalActions, onChartClick, onDecisionClick, onNoteClick
 }
 
 /* ─── Action sub-row — white background, vembu style ────────────────────────── */
-function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisionClick, onNoteClick, onFileClick }) {
+function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisionClick, onNoteClick, onNotePopoverClick, onFileClick }) {
   const pct        = Math.min(100, Number(action.actionGoalPercentAchieve || 0));
   const [localPct, setLocalPct] = useState(pct);
   const endDate    = action.endDate || action.milestoneDate;
@@ -374,7 +378,11 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
             {action.actionName || '—'}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 4 }}>
-            <button onClick={onNoteClick} title="Notes" style={{ background:'none',border:'none',cursor:'pointer',padding:0,position:'relative',display:'flex' }}>
+            <button
+              onClick={e => (onNotePopoverClick || onNoteClick)(e)}
+              title="Notes / History / Activity Log"
+              style={{ background:'none',border:'none',cursor:'pointer',padding:0,position:'relative',display:'flex' }}
+            >
               <NoteIcon color={action.notesCount > 0 ? planColor : '#adb5bd'} hasNotes={action.notesCount > 0} />
             </button>
             <button onClick={onFileClick} title="Files" style={{ background:'none',border:'none',cursor:'pointer',padding:0,position:'relative',display:'flex' }}>
@@ -1286,6 +1294,9 @@ export default function WorkPlan() {
   const [showGoalModal,    setShowGoalModal]    = useState(false);
   const [chartGoal,        setChartGoal]        = useState(null); // { goal, goalActions }
   const [notesCtx,         setNotesCtx]         = useState(null); // { growthPlanId, goalTagId, actionTagId, planColor }
+  const [notePopover,      setNotePopover]      = useState(null); // { x, y, growthPlanId, goalTagId, actionTagId, title, planColor, isAction }
+  const [historyCtx,       setHistoryCtx]       = useState(null); // { growthPlanId, goalTagId, actionTagId, title, planColor }
+  const [activityCtx,      setActivityCtx]      = useState(null); // { growthPlanId, goalTagId, actionTagId, title }
   const [filesCtx,         setFilesCtx]         = useState(null); // { growthPlanId, goalTagId, actionTagId, planColor }
   const [refreshKey,       setRefreshKey]       = useState(0);
   const [hideComplete,     setHideComplete]     = useState(false);
@@ -1617,6 +1628,19 @@ export default function WorkPlan() {
                   onChartClick={(g, ga) => setChartGoal({ goal: g, goalActions: ga, initialTab: 'chart' })}
                   onDecisionClick={(g, ga) => setChartGoal({ goal: g, goalActions: ga, initialTab: 'decision' })}
                   onNoteClick={() => setNotesCtx({ growthPlanId: Number(planId), goalTagId: goal.goalTagId, actionTagId: null, planColor: themeColor })}
+                  onNotePopoverClick={e => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setNotePopover({
+                      x: rect.right + 4,
+                      y: rect.top + window.scrollY,
+                      growthPlanId: Number(planId),
+                      goalTagId: goal.goalTagId,
+                      actionTagId: null,
+                      title: goal.goalName,
+                      planColor: themeColor,
+                      isAction: false,
+                    });
+                  }}
                   onFileClick={() => setFilesCtx({ growthPlanId: Number(planId), goalTagId: goal.goalTagId, actionTagId: null, planColor: themeColor })}
                 />,
                 ...visibleActions.map((action, ai) => (
@@ -1627,6 +1651,19 @@ export default function WorkPlan() {
                     onChartClick={() => setChartGoal({ goal, goalActions, initialTab: 'chart' })}
                     onDecisionClick={() => setChartGoal({ goal, goalActions, initialTab: 'decision' })}
                     onNoteClick={() => setNotesCtx({ growthPlanId: Number(planId), goalTagId: action.goalId, actionTagId: action.actionTagId, planColor: themeColor })}
+                    onNotePopoverClick={e => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setNotePopover({
+                        x: rect.right + 4,
+                        y: rect.top + window.scrollY,
+                        growthPlanId: Number(planId),
+                        goalTagId: action.goalId,
+                        actionTagId: action.actionTagId,
+                        title: action.actionName,
+                        planColor: themeColor,
+                        isAction: true,
+                      });
+                    }}
                     onFileClick={() => setFilesCtx({ growthPlanId: Number(planId), goalTagId: action.goalId, actionTagId: action.actionTagId, planColor: themeColor })}
                     onSliderCommit={(progress) => {
                       api.updateActionProgress({
@@ -1756,6 +1793,301 @@ export default function WorkPlan() {
           onClose={() => setShowContribModal(false)}
         />
       )}
+
+      {/* ─── Note icon popover: Notes | History | Activity Log ─── */}
+      {notePopover && (
+        <NotePopover
+          x={notePopover.x}
+          y={notePopover.y}
+          planColor={notePopover.planColor || C.teal}
+          onNotes={() => {
+            setNotesCtx({
+              growthPlanId: notePopover.growthPlanId,
+              goalTagId:    notePopover.goalTagId,
+              actionTagId:  notePopover.actionTagId,
+              planColor:    notePopover.planColor,
+            });
+            setNotePopover(null);
+          }}
+          onHistory={() => {
+            setHistoryCtx({
+              growthPlanId: notePopover.growthPlanId,
+              goalTagId:    notePopover.goalTagId,
+              actionTagId:  notePopover.actionTagId,
+              title:        notePopover.title,
+              planColor:    notePopover.planColor,
+            });
+            setNotePopover(null);
+          }}
+          onActivityLog={() => {
+            setActivityCtx({
+              growthPlanId: notePopover.growthPlanId,
+              goalTagId:    notePopover.goalTagId,
+              actionTagId:  notePopover.actionTagId,
+              title:        notePopover.title,
+            });
+            setNotePopover(null);
+          }}
+          onClose={() => setNotePopover(null)}
+        />
+      )}
+
+      {/* ─── History Modal ─── */}
+      {historyCtx && (
+        <HistoryModal
+          {...historyCtx}
+          entityId={entityId}
+          onClose={() => setHistoryCtx(null)}
+        />
+      )}
+
+      {/* ─── Activity Log Modal ─── */}
+      {activityCtx && (
+        <ActivityLogModal
+          {...activityCtx}
+          entityId={entityId}
+          onClose={() => setActivityCtx(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * NOTE ICON POPOVER + HISTORY + ACTIVITY LOG
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/* ─── NotePopover — 3-button dropdown matching Vembu popover ───────────────── */
+function NotePopover({ x, y, planColor, onNotes, onHistory, onActivityLog, onClose }) {
+  const color = planColor || '#0197cc';
+  const ref   = useRef(null);
+
+  // Close on click-outside
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) onClose();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  const btnStyle = {
+    display: 'block', width: '100%', textAlign: 'left',
+    background: 'none', border: 'none', cursor: 'pointer',
+    padding: '6px 14px', fontSize: 13, color: '#23282c',
+    whiteSpace: 'nowrap',
+  };
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: 'fixed',
+        left: x,
+        top: y,
+        zIndex: 9999,
+        background: '#fff',
+        border: `1px solid ${color}`,
+        borderRadius: 4,
+        boxShadow: '0 3px 10px rgba(0,0,0,0.18)',
+        minWidth: 130,
+        padding: '4px 0',
+      }}
+    >
+      <button
+        style={btnStyle}
+        onMouseEnter={e => { e.currentTarget.style.background = '#f0f8ff'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
+        onClick={onNotes}
+      >Notes</button>
+      <button
+        style={btnStyle}
+        onMouseEnter={e => { e.currentTarget.style.background = '#f0f8ff'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
+        onClick={onHistory}
+      >History</button>
+      <button
+        style={btnStyle}
+        onMouseEnter={e => { e.currentTarget.style.background = '#f0f8ff'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
+        onClick={onActivityLog}
+      >Activity Log</button>
+    </div>
+  );
+}
+
+/* ─── HistoryModal — shows past notes for a goal/action (matching Vembu FloatingNotesHistory) */
+function HistoryModal({ growthPlanId, goalTagId, actionTagId, title, planColor, entityId, onClose }) {
+  const [notes, setNotes]     = useState([]);
+  const [loading, setLoading] = useState(true);
+  const color = planColor || '#0197cc';
+
+  useEffect(() => {
+    api.updateGoalActionNotes({ action: 'GET', growthPlanId, goalTagId: goalTagId || null, actionTagId: actionTagId || null })
+      .then(r => { setNotes(r.data?.result || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [growthPlanId, goalTagId, actionTagId]);
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000,
+    }}>
+      <div style={{
+        background: '#fff', borderRadius: 8, width: 620, maxWidth: '95vw',
+        maxHeight: '80vh', display: 'flex', flexDirection: 'column',
+        border: `3px solid ${color}`, boxShadow: '0 6px 28px rgba(0,0,0,0.22)',
+      }}>
+        {/* Header */}
+        <div style={{
+          background: color, color: '#fff', padding: '10px 16px',
+          borderRadius: '5px 5px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <span style={{ fontWeight: 700, fontSize: 14 }}>History — {title || 'Notes'}</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 32, color: '#888' }}>Loading…</div>
+          ) : notes.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 32, color: '#888' }}>No notes found.</div>
+          ) : (
+            notes.map((n, i) => (
+              <div key={n.notesId || i} style={{
+                borderBottom: '1px solid #e4e7ea', padding: '10px 0',
+                fontSize: 13, color: '#23282c',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ fontWeight: 600, color }}>
+                    {n.firstName ? `${n.firstName} ${n.lastName || ''}`.trim() : 'User'}
+                  </span>
+                  <span style={{ fontSize: 11, color: '#888' }}>
+                    {n.created ? new Date(n.created).toLocaleString() : ''}
+                  </span>
+                </div>
+                <div
+                  style={{ lineHeight: 1.5 }}
+                  dangerouslySetInnerHTML={{ __html: n.notes || '' }}
+                />
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '10px 16px', borderTop: '1px solid #e4e7ea', textAlign: 'right' }}>
+          <button
+            onClick={onClose}
+            style={{
+              background: color, color: '#fff', border: 'none', borderRadius: 4,
+              padding: '6px 18px', fontSize: 13, cursor: 'pointer', fontWeight: 600,
+            }}
+          >Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── ActivityLogModal — matches Vembu ViewActivityLog ─────────────────────── */
+function ActivityLogModal({ growthPlanId, goalTagId, actionTagId, title, entityId, onClose }) {
+  const [calendar, setCalendar] = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [orderBy,  setOrderBy]  = useState('desc');
+
+  useEffect(() => {
+    api.getEntityActivity({ growthPlanId, goalTagId: goalTagId || null, actionTagId: actionTagId || null })
+      .then(r => { setCalendar(r.data?.calendar || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [growthPlanId, goalTagId, actionTagId]);
+
+  const list = orderBy === 'desc' ? [...calendar].reverse() : calendar;
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000,
+    }}>
+      <div style={{
+        background: '#fff', borderRadius: 8, width: 760, maxWidth: '96vw',
+        maxHeight: '82vh', display: 'flex', flexDirection: 'column',
+        border: '3px solid #20a8d8', boxShadow: '0 6px 28px rgba(0,0,0,0.22)',
+      }}>
+        {/* Header */}
+        <div style={{
+          background: '#20a8d8', color: '#fff', padding: '10px 16px',
+          borderRadius: '5px 5px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <span style={{ fontWeight: 700, fontSize: 14 }}>View Activity Log{title ? ` — ${title}` : ''}</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
+        </div>
+
+        {/* Sort control */}
+        <div style={{ padding: '8px 16px', borderBottom: '1px solid #e4e7ea', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{ fontSize: 12, color: '#73818f' }}>Sort by:</label>
+          <select
+            value={orderBy}
+            onChange={e => setOrderBy(e.target.value)}
+            style={{ fontSize: 12, padding: '2px 6px', borderRadius: 3, border: '1px solid #ccc' }}
+          >
+            <option value="desc">Newest First</option>
+            <option value="asc">Oldest First</option>
+          </select>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px' }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 40, color: '#888' }}>Loading…</div>
+          ) : list.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 40, color: '#888' }}>No Activity Log Found</div>
+          ) : (
+            list.map((day, di) => {
+              const audits = orderBy === 'desc'
+                ? [...(day.auditList || [])].reverse()
+                : (day.auditList || []);
+              return (
+                <div key={di} style={{ marginBottom: 12 }}>
+                  <div style={{ fontWeight: 700, color: '#0197cc', fontSize: 13, marginBottom: 4 }}>
+                    {day.calendarDisplay}
+                  </div>
+                  {audits.map((item, mi) => {
+                    if (!item.auditMessage) return null;
+                    const name = `${item.firstName || ''} ${item.lastName || ''}`.trim();
+                    const msg = item.auditMessage
+                      .replace('You ', name + ' ')
+                      .replace(/growth/g, 'goal')
+                      .replace(/Growth/g, 'Goal');
+                    return (
+                      <div key={mi} style={{
+                        padding: '4px 8px',
+                        fontSize: 12.5, color: '#23282c',
+                        borderBottom: '1px solid #f0f0f0',
+                        lineHeight: 1.5,
+                      }}>
+                        {msg}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '10px 16px', borderTop: '1px solid #e4e7ea', textAlign: 'right' }}>
+          <button
+            onClick={onClose}
+            style={{
+              background: '#20a8d8', color: '#fff', border: 'none', borderRadius: 4,
+              padding: '6px 18px', fontSize: 13, cursor: 'pointer', fontWeight: 600,
+            }}
+          >Close</button>
+        </div>
+      </div>
     </div>
   );
 }
