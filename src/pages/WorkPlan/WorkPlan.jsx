@@ -104,10 +104,14 @@ const TOOLBAR_ICONS = [
 ];
 
 /* ─── Goal progress bar — matches vembu: colored fill + 3 tick marks ────────── */
-function GoalProgressBar({ pct, goalMin, goalStretch, themeColor }) {
+function GoalProgressBar({ pct, goalMin, goalStretch, goalProgressType, themeColor }) {
   const p   = Math.min(100, Math.max(0, Number(pct) || 0));
-  // vembu color logic for goal
-  const fill = p < 50 ? '#ffa500' : p < 80 ? '#008ECC' : '#0B6623';
+  // vembu color logic: goalProgressType===1 means lower-is-better (e.g. cost reduction)
+  // progressType===1: >=80 red, 50-79 orange, <50 green
+  // progressType!==1: >=80 green, 50-79 blue, <50 orange
+  const fill = goalProgressType === 1
+    ? (p >= 80 ? '#b7274b' : p >= 50 ? '#ffa500' : '#0B6623')
+    : (p >= 80 ? '#0B6623' : p >= 50 ? '#0086c0' : '#ffa500');
   // tick positions
   const minPct     = goalMin     ? Math.min(100, Number(goalMin))     : null;
   const stretchPct = goalStretch ? Math.min(99,  Number(goalStretch)) : null;
@@ -328,12 +332,18 @@ function GoalRow({ goal, goalActions, onChartClick, onDecisionClick, onNoteClick
           pct={pct}
           goalMin={goal.goalMin}
           goalStretch={goal.goalStretch}
+          goalProgressType={goal.goalProgressType}
         />
       </td>
 
-      {/* % cell — yellow square moved to icon column */}
-      <td style={{ padding: '0 6px', width: 60, textAlign: 'right', fontSize: 13, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>
-        {pct.toFixed(1)}%
+      {/* % cell — red+bold+animated when HeadsUp pending (matches vembu) */}
+      <td style={{ padding: '0 6px', width: 60, textAlign: 'right', fontSize: 13, fontWeight: 700, color: hasHeadsUp ? '#d50000' : '#fff', whiteSpace: 'nowrap', position: 'relative' }}>
+        <span style={hasHeadsUp ? { fontWeight: 800, animation: 'pulse 1.2s infinite' } : {}}>
+          {pct.toFixed(1)}%
+        </span>
+        {hasHeadsUp && (
+          <span style={{ position: 'absolute', top: -3, right: -2, fontSize: 10, color: '#d50000', fontWeight: 900 }}>!</span>
+        )}
       </td>
 
       {/* Due date */}
@@ -430,9 +440,14 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
         />
       </td>
 
-      {/* % cell — no yellow square here (moved to icon column) */}
-      <td style={{ padding: '0 6px', width: 60, textAlign: 'right', fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap' }}>
-        {localPct.toFixed(1)}%
+      {/* % cell — red+bold+animated when HeadsUp pending (matches vembu) */}
+      <td style={{ padding: '0 6px', width: 60, textAlign: 'right', fontSize: 12.5, fontWeight: 600, color: hasHeadsUp ? '#d50000' : C.text, whiteSpace: 'nowrap', position: 'relative' }}>
+        <span style={hasHeadsUp ? { fontWeight: 800, animation: 'pulse 1.2s infinite' } : {}}>
+          {localPct.toFixed(1)}%
+        </span>
+        {hasHeadsUp && (
+          <span style={{ position: 'absolute', top: -3, right: -2, fontSize: 10, color: '#d50000', fontWeight: 900 }}>!</span>
+        )}
       </td>
 
       {/* Due date — date text if set, FA-style calendar icon if not (matches vembu) */}
