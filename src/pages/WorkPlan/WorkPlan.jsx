@@ -357,12 +357,15 @@ function GoalRow({ goal, goalActions, onChartClick, onDecisionClick, onNoteClick
 }
 
 /* ─── Action sub-row — white background, vembu style ────────────────────────── */
-function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisionClick, onNoteClick, onNotePopoverClick, onFileClick }) {
+function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisionClick, onNoteClick, onNotePopoverClick, onFileClick, isChild, onPublishToggle }) {
   const pct        = Math.min(100, Number(action.actionGoalPercentAchieve || 0));
   const [localPct, setLocalPct] = useState(pct);
   const endDate    = action.endDate || action.milestoneDate;
   const planColor  = themeColor || C.teal;
   const hasHeadsUp = action.actionFeedbackStatus != null && action.actionFeedbackStatus === 0;
+  // publishToMaster: 0 = no relationship (skip checkbox), non-zero = child plan row (show checkbox)
+  // Checkbox only shows when isChild=true AND publishToMaster !== 0
+  const showPublish = !!isChild && action.publishToMaster !== 0;
 
   return (
     <tr style={{ background: '#fff', borderBottom: `1px solid ${C.border}`, height: 32 }}>
@@ -380,6 +383,17 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
           width: '100%',
           boxSizing: 'border-box',
         }}>
+          {/* publishToMaster checkbox — only on child plan action rows where publishToMaster !== 0 */}
+          {showPublish && (
+            <input
+              type="checkbox"
+              checked={action.publishToMaster === 1 || action.publishToMaster === 3}
+              onChange={() => {}}
+              onClick={() => onPublishToggle && onPublishToggle(action)}
+              title="Sync to master plan"
+              style={{ cursor: 'pointer', marginRight: 5, flexShrink: 0 }}
+            />
+          )}
           <span style={{
             fontSize: 12.5, color: C.text,
             flex: 1,
@@ -1046,6 +1060,7 @@ function HeadsUpTab({ goal, growthPlanId, entityId, onRefresh }) {
     if (!text.trim()) { toast.warning('Enter your comment'); return; }
     setSaving(true);
     try {
+      // Vembu: UPDATE action does NOT send actionFeedbackStatus — SP sets it to 0 automatically
       await api.updateActionFeedback({
         action: 'UPDATE',
         teamId: String(growthPlanId),
@@ -1053,7 +1068,6 @@ function HeadsUpTab({ goal, growthPlanId, entityId, onRefresh }) {
         actionTagId: null,
         actionFeedback: text,
         entityId,
-        actionFeedbackStatus: null,
       });
       toast.success('HeadsUp saved');
       setStatus(0);
@@ -1347,9 +1361,12 @@ export default function WorkPlan() {
   /* ── mutations ── */
   const addGoalMutation = useMutation({
     mutationFn: (form) => api.goalActionCreate({
-      entityId, companyId, growthPlanId: planId,
-      action: 'ADDGOAL', goalName: form.goalName,
-      category: form.category, targetValue: Number(form.targetValue), endDate: form.endDate,
+      entityId,
+      companyId,
+      growthPlanId: Number(planId),
+      goalName: form.goalName,
+      categoryId: null,   // category lookup not needed for basic add
+      teamId: String(planId), // childPlanId = growthPlanId for owned plans
     }),
     onSuccess: () => {
       toast.success('Goal added!');
@@ -1433,6 +1450,10 @@ export default function WorkPlan() {
   const plan       = Array.isArray(rawData.growthPlan) ? (rawData.growthPlan[0] || {}) : (rawData.growthPlan || {});
   const rawGoals   = rawData.goals   || [];
   const actions    = rawData.actions || [];
+  // isChild: true when viewing a child/nested plan (growthPlanId !== childPlanId)
+  // Vembu: isChild = String(growthPlanId) !== childPlanId
+  // For simplicity: a plan is a child if ownerEntityId !== entityId
+  const isChild = plan.ownerEntityId && plan.ownerEntityId !== entityId;
   // Apply sort based on filter selection
   const goals = sortBy === 'Goal'
     ? [...rawGoals].sort((a, b) => (a.goalName || '').localeCompare(b.goalName || ''))
@@ -1664,6 +1685,17 @@ export default function WorkPlan() {
                     key={`a-${action.actionId || ai}`}
                     action={action}
                     themeColor={themeColor}
+                    isChild={!!isChild}
+                    onPublishToggle={(a) => {
+                      api.updateActionFeedback({
+                        action: 'PUBLISHTOMASTERACTION',
+                        teamId: String(planId),
+                        goalTagId: goal.goalTagId,
+                        actionTagId: a.actionTagId,
+                        entityId,
+                        publish: a.publishToMaster === 2 ? 1 : 2,
+                      }).then(doRefresh).catch(() => toast.error('Failed to update sync'));
+                    }}
                     onChartClick={() => setChartGoal({ goal, goalActions, initialTab: 'chart' })}
                     onDecisionClick={() => setChartGoal({ goal, goalActions, initialTab: 'decision' })}
                     onNoteClick={() => setNotesCtx({ growthPlanId: Number(planId), goalTagId: action.goalId, actionTagId: action.actionTagId, planColor: themeColor })}
