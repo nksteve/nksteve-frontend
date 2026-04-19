@@ -1322,6 +1322,7 @@ export default function WorkPlan() {
   const [showLinkModal,    setShowLinkModal]    = useState(false);  // Link btn
   const [showPickerModal,  setShowPickerModal]  = useState(false);  // Palette/color picker
   const [showContribModal, setShowContribModal] = useState(false);  // Users/contributors
+  const [showRateModal,    setShowRateModal]    = useState(false);  // Rate Meeting
   const [showBarReport,    setShowBarReport]    = useState(false);  // Chart (bar) btn
   const [showStackReport,  setShowStackReport]  = useState(false);  // Stack btn
   const [showFireReport,   setShowFireReport]   = useState(false);  // Fire/trending btn
@@ -1458,7 +1459,7 @@ export default function WorkPlan() {
 
       {/* ── Left edge vertical tabs (Invite + Rate Meeting) — vembu style ── */}
       <div style={{ position: 'fixed', left: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 10, display: 'flex', flexDirection: 'column', gap: 0, pointerEvents: 'none' }}>
-        <div style={{
+        <div onClick={() => setShowContribModal(true)} style={{
           writingMode: 'vertical-rl', textOrientation: 'mixed', transform: 'rotate(180deg)',
           background: C.teal, color: '#fff', fontSize: 12, fontWeight: 600,
           padding: '10px 6px', cursor: 'pointer', letterSpacing: 1,
@@ -1466,7 +1467,7 @@ export default function WorkPlan() {
         }}>
           Invite
         </div>
-        <div style={{
+        <div onClick={() => setShowRateModal(true)} style={{
           writingMode: 'vertical-rl', textOrientation: 'mixed', transform: 'rotate(180deg)',
           background: C.purple, color: '#fff', fontSize: 12, fontWeight: 600,
           padding: '10px 6px', cursor: 'pointer', letterSpacing: 1,
@@ -1806,6 +1807,16 @@ export default function WorkPlan() {
           entityId={entityId}
           companyId={companyId}
           onClose={() => setShowContribModal(false)}
+        />
+      )}
+
+      {showRateModal && (
+        <RateMeetingModal
+          growthPlanId={planId}
+          entityId={entityId}
+          planColor={plan?.colorCode || 'teal'}
+          onClose={() => setShowRateModal(false)}
+          onSubmit={() => { setShowRateModal(false); setRefreshKey(k => k + 1); }}
         />
       )}
 
@@ -2356,6 +2367,74 @@ function TrendingReportModal({ planId, entityId, companyId, onClose }) {
         </div>
         <div style={{ padding:'12px 20px',borderTop:'1px solid #e4e7ea',display:'flex',justifyContent:'flex-end' }}>
           <button onClick={onClose} style={{ padding:'8px 20px',background:'#0197cc',color:'#fff',border:'none',borderRadius:5,cursor:'pointer',fontWeight:600 }}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Rate Meeting Modal ─── */
+function RateMeetingModal({ growthPlanId, entityId, planColor, onClose, onSubmit }) {
+  const { token } = useAuthStore();
+  const tok = typeof token === 'function' ? token() : token;
+  const [range,    setRange]    = useState(3);
+  const [comments, setComments] = useState('');
+  const [saving,   setSaving]   = useState(false);
+
+  const EMOJIS = { 1: '\u{1F621}', 2: '\u{1F626}', 3: '\u{1F610}', 4: '\u{1F600}', 5: '\u{1F917}' };
+
+  const handleSubmit = async () => {
+    if (!comments.trim()) { alert('Please enter comments'); return; }
+    setSaving(true);
+    try {
+      await api.updateGoalActionNotes({
+        action: 'UPDATEMEETINGHISTORY',
+        growthPlanId, entityId,
+        notesType: 'RateMyMeeting',
+        notes: comments,
+        teamId: String(growthPlanId),
+        rating: range,
+      }, tok);
+      onSubmit();
+    } catch(e) { alert('Error saving rating'); }
+    finally { setSaving(false); }
+  };
+
+  const overlay = { position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',zIndex:3000,display:'flex',alignItems:'center',justifyContent:'center' };
+  const modal   = { background:'#fff',borderRadius:8,width:380,overflow:'hidden',boxShadow:'0 8px 32px rgba(0,0,0,0.22)' };
+  const hdr     = { background: C.teal, color:'#fff', padding:'12px 16px', display:'flex', justifyContent:'space-between', alignItems:'center' };
+  const body    = { padding:24, display:'flex', flexDirection:'column', alignItems:'center', gap:12 };
+
+  return (
+    <div style={overlay} onMouseDown={e => e.target === e.currentTarget && onClose()}>
+      <div style={modal}>
+        <div style={hdr}>
+          <span style={{ fontWeight:700, fontSize:15 }}>Rate This Meeting</span>
+          <button onClick={onClose} style={{ background:'none',border:'none',color:'#fff',fontSize:20,cursor:'pointer',lineHeight:1 }}>×</button>
+        </div>
+        <div style={body}>
+          <div style={{ fontSize:72, lineHeight:1 }}>{EMOJIS[range]}</div>
+          <input
+            type="range" min={1} max={5} value={range}
+            onChange={e => setRange(Number(e.target.value))}
+            style={{ width:'100%', accentColor: C.teal }}
+          />
+          <div style={{ display:'flex', justifyContent:'space-between', width:'100%', fontSize:12, color:'#888' }}>
+            <span>Poor</span><span>Excellent</span>
+          </div>
+          <textarea
+            rows={4}
+            placeholder="Please tell me how we might make this plan and/or our meetings better."
+            value={comments}
+            onChange={e => setComments(e.target.value)}
+            style={{ width:'100%', border:`1px solid ${C.border}`, borderRadius:4, padding:'8px 10px', fontSize:13, resize:'vertical', fontFamily:'inherit' }}
+          />
+          <div style={{ display:'flex', gap:8, justifyContent:'flex-end', width:'100%' }}>
+            <button onClick={onClose} style={{ padding:'7px 18px', borderRadius:4, border:`1px solid ${C.border}`, background:'#fff', cursor:'pointer', fontSize:13 }}>Cancel</button>
+            <button onClick={handleSubmit} disabled={saving} style={{ padding:'7px 18px', borderRadius:4, border:'none', background: C.teal, color:'#fff', cursor:'pointer', fontSize:13, fontWeight:600 }}>
+              {saving ? 'Saving…' : 'Submit'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
