@@ -151,18 +151,18 @@ function GoalProgressBar({ pct, goalMin, goalStretch, goalProgressType }) {
 // Color logic: CA-orange <50, CA-blue 50-79, CA-green >=80
 const makeSlider = (color) => styled(Slider)({
   color,
-  height: 8,
+  height: 4,
   padding: '13px 0',
   '& .MuiSlider-thumb': {
-    height: 22,
-    width: 22,
+    height: 20,
+    width: 20,
     backgroundColor: '#fff',
     border: '2px solid currentColor',
-    boxShadow: '0 1px 4px rgba(0,0,0,.2)',
-    '&:focus,&:hover,&.Mui-active': { boxShadow: '0 0 0 6px rgba(0,0,0,.1)' },
+    boxShadow: '0 1px 3px rgba(0,0,0,.3)',
+    '&:focus,&:hover,&.Mui-active': { boxShadow: '0 0 0 4px rgba(0,0,0,.1)' },
   },
-  '& .MuiSlider-track': { height: 8, borderRadius: 4 },
-  '& .MuiSlider-rail':  { height: 8, borderRadius: 4, opacity: 0.28 },
+  '& .MuiSlider-track': { height: 4, borderRadius: 4 },
+  '& .MuiSlider-rail':  { height: 4, borderRadius: 4, opacity: 0.3 },
   '& .MuiSlider-valueLabel': { fontSize: 11, background: color },
 });
 
@@ -1486,7 +1486,12 @@ export default function WorkPlan() {
     : sortBy === 'Status'
     ? [...rawGoals].sort((a, b) => (a.goalStatus||'').localeCompare(b.goalStatus||''))
     : rawGoals;
-  const percent    = Number(plan.growthPlanPercentAchieved || 0);
+  // Compute plan % from actions — more accurate than SP-stored value which needs CALCULATOR_movement
+  // Falls back to SP value if no actions loaded yet
+  const computedPercent = actions.length > 0
+    ? actions.reduce((sum, a) => sum + Number(a.actionGoalPercentAchieve || 0), 0) / actions.length
+    : Number(plan.growthPlanPercentAchieved || 0);
+  const percent = Math.min(100, computedPercent);
   const themeColor = plan.colorCodeHex
     ? (plan.colorCodeHex.startsWith('#') ? plan.colorCodeHex : `#${plan.colorCodeHex}`)
     : C.teal;
