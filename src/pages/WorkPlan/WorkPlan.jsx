@@ -249,9 +249,20 @@ function DecisionIcon({ color, active }) {
   );
 }
 
-/* ─── Yellow square dot (vembu uses a yellow square, not circle) ─────────────── */
-function YellowDot() {
-  return <div style={{ width: 12, height: 12, background: '#ffc107', borderRadius: 2, flexShrink: 0 }} />;
+/* ─── HeadsUp info-circle icon — matches vembu fa fa-info-circle exactly ─────── */
+function InfoCircle({ onClick, style = {} }) {
+  return (
+    <svg
+      viewBox="0 0 512 512" width={12} height={12}
+      fill="#d50000"
+      style={{ cursor: 'pointer', flexShrink: 0, ...style }}
+      onClick={onClick}
+      title="HeadsUp pending"
+    >
+      {/* Font Awesome fa-info-circle path */}
+      <path d="M256 8C119.043 8 8 119.083 8 256c0 136.997 111.043 248 248 248s248-111.003 248-248C504 119.083 392.957 8 256 8zm0 110c23.196 0 42 18.804 42 42s-18.804 42-42 42-42-18.804-42-42 18.804-42 42-42zm56 254c0 6.627-5.373 12-12 12h-88c-6.627 0-12-5.373-12-12v-24c0-6.627 5.373-12 12-12h12v-64h-12c-6.627 0-12-5.373-12-12v-24c0-6.627 5.373-12 12-12h64c6.627 0 12 5.373 12 12v100h12c6.627 0 12 5.373 12 12v24z"/>
+    </svg>
+  );
 }
 
 /* ─── Goal header row — purple band matching vembu ─────────────────────────── */
@@ -305,7 +316,7 @@ function GoalRow({ goal, goalActions, onChartClick, onDecisionClick, onNoteClick
         </div>
       </td>
 
-      {/* Bar chart + decision icons + yellow square if HeadsUp pending (matches vembu: icon column) */}
+      {/* Bar chart + decision icons — vembu: no dot here, info-circle goes on the % cell */}
       <td style={{ padding: '0 4px', width: 64 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <button
@@ -322,7 +333,6 @@ function GoalRow({ goal, goalActions, onChartClick, onDecisionClick, onNoteClick
           >
             <DecisionIcon color="rgba(255,255,255,0.75)" />
           </button>
-          {hasHeadsUp && <YellowDot />}
         </div>
       </td>
 
@@ -336,14 +346,14 @@ function GoalRow({ goal, goalActions, onChartClick, onDecisionClick, onNoteClick
         />
       </td>
 
-      {/* % cell — red+bold+animated when HeadsUp pending (matches vembu) */}
+      {/* % cell — red+bold+animated + info-circle icon when HeadsUp pending (matches vembu exactly) */}
       <td style={{ padding: '0 6px', width: 60, textAlign: 'right', fontSize: 13, fontWeight: 700, color: hasHeadsUp ? '#d50000' : '#fff', whiteSpace: 'nowrap', position: 'relative' }}>
-        <span style={hasHeadsUp ? { fontWeight: 800, animation: 'pulse 1.2s infinite' } : {}}>
-          {pct.toFixed(1)}%
-        </span>
-        {hasHeadsUp && (
-          <span style={{ position: 'absolute', top: -3, right: -2, fontSize: 10, color: '#d50000', fontWeight: 900 }}>!</span>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3 }}>
+          <span style={hasHeadsUp ? { fontWeight: 800, animation: 'pulse 1.2s infinite' } : {}}>
+            {pct.toFixed(1)}%
+          </span>
+          {hasHeadsUp && <InfoCircle style={{ position: 'absolute', fontSize: 12, top: '50%', right: 2, transform: 'translateY(-50%)' }} />}
+        </div>
       </td>
 
       {/* Due date */}
@@ -357,15 +367,25 @@ function GoalRow({ goal, goalActions, onChartClick, onDecisionClick, onNoteClick
 }
 
 /* ─── Action sub-row — white background, vembu style ────────────────────────── */
-function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisionClick, onNoteClick, onNotePopoverClick, onFileClick, isChild, onPublishToggle }) {
+function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisionClick, onNoteClick, onNotePopoverClick, onFileClick, isChild, onPublishToggle, onNameSave }) {
   const pct        = Math.min(100, Number(action.actionGoalPercentAchieve || 0));
   const [localPct, setLocalPct] = useState(pct);
+  const [localName, setLocalName] = useState(action.actionName || '');
   const endDate    = action.endDate || action.milestoneDate;
   const planColor  = themeColor || C.teal;
   const hasHeadsUp = action.actionFeedbackStatus != null && action.actionFeedbackStatus === 0;
   // publishToMaster: 0 = no relationship (skip checkbox), non-zero = child plan row (show checkbox)
   // Checkbox only shows when isChild=true AND publishToMaster !== 0
   const showPublish = !!isChild && action.publishToMaster !== 0;
+
+  const handleNameBlur = () => {
+    const trimmed = localName.trim();
+    if (trimmed && trimmed !== action.actionName) {
+      onNameSave && onNameSave(trimmed);
+    } else {
+      setLocalName(action.actionName || '');
+    }
+  };
 
   return (
     <tr style={{ background: '#fff', borderBottom: `1px solid ${C.border}`, height: 32 }}>
@@ -394,13 +414,19 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
               style={{ cursor: 'pointer', marginRight: 5, flexShrink: 0 }}
             />
           )}
-          <span style={{
-            fontSize: 12.5, color: C.text,
-            flex: 1,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {action.actionName || '—'}
-          </span>
+          <input
+            type="text"
+            value={localName}
+            onChange={e => setLocalName(e.target.value)}
+            onBlur={handleNameBlur}
+            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+            style={{
+              fontSize: 12.5, color: C.text,
+              flex: 1, border: 'none', outline: 'none', background: 'transparent',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              padding: 0, cursor: 'text', minWidth: 0,
+            }}
+          />
           <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 4 }}>
             <button
               onClick={e => (onNotePopoverClick || onNoteClick)(e)}
@@ -417,7 +443,7 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
         </div>
       </td>
 
-      {/* Bar chart + decision icons — with yellow square if HeadsUp pending (matches vembu: icon column) */}
+      {/* Bar chart + decision icons — vembu: no dot here, info-circle goes on the % cell */}
       <td style={{ padding: '0 4px', width: 64, position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <button
@@ -438,7 +464,6 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
           >
             <DecisionIcon color="currentColor" />
           </button>
-          {hasHeadsUp && <YellowDot />}
         </div>
       </td>
 
@@ -454,14 +479,14 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
         />
       </td>
 
-      {/* % cell — red+bold+animated when HeadsUp pending (matches vembu) */}
+      {/* % cell — red+bold+animated + info-circle icon when HeadsUp pending (matches vembu exactly) */}
       <td style={{ padding: '0 6px', width: 60, textAlign: 'right', fontSize: 12.5, fontWeight: 600, color: hasHeadsUp ? '#d50000' : C.text, whiteSpace: 'nowrap', position: 'relative' }}>
-        <span style={hasHeadsUp ? { fontWeight: 800, animation: 'pulse 1.2s infinite' } : {}}>
-          {localPct.toFixed(1)}%
-        </span>
-        {hasHeadsUp && (
-          <span style={{ position: 'absolute', top: -3, right: -2, fontSize: 10, color: '#d50000', fontWeight: 900 }}>!</span>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3 }}>
+          <span style={hasHeadsUp ? { fontWeight: 800, animation: 'pulse 1.2s infinite' } : {}}>
+            {localPct.toFixed(1)}%
+          </span>
+          {hasHeadsUp && <InfoCircle style={{ position: 'absolute', fontSize: 12, top: '50%', right: 2, transform: 'translateY(-50%)' }} />}
+        </div>
       </td>
 
       {/* Due date — date text if set, FA-style calendar icon if not (matches vembu) */}
@@ -1713,6 +1738,19 @@ export default function WorkPlan() {
                       });
                     }}
                     onFileClick={() => setFilesCtx({ growthPlanId: Number(planId), goalTagId: action.goalId, actionTagId: action.actionTagId, planColor: themeColor })}
+                    onNameSave={(newName) => {
+                      api.updateAction({
+                        action: 'UPDATE',
+                        actionId: action.actionTagId,
+                        goalId: action.goalId,
+                        entityId,
+                        name: newName,
+                        companyId,
+                        teamId: String(planId),
+                      })
+                        .then(() => queryClient.invalidateQueries(['planDetail', planId]))
+                        .catch(() => toast.error('Failed to rename action'));
+                    }}
                     onSliderCommit={(progress) => {
                       api.updateActionProgress({
                         updateDelete: 'PROGRESS',
