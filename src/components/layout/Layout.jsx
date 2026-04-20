@@ -330,8 +330,8 @@ export default function Layout({ children }) {
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: '0 24px' }}>
           <CompanyUserSelect
             userList={userListData}
-            companyName={setupData?.companyName || ''}
-            userName={setupData ? [setupData.firstName, setupData.lastName].filter(Boolean).join(' ') : ''}
+            companyName={setupData?.companyName || user?.companyName || ''}
+            userName={setupData ? [setupData.firstName, setupData.lastName].filter(Boolean).join(' ') : [user?.firstName, user?.lastName].filter(Boolean).join(' ')}
             onSwitch={(u) => {
               // Admin user-switching functionality would go here
               console.log('Switch to user:', u);
