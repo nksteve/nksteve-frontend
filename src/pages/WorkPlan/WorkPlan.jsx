@@ -19,7 +19,8 @@ import {
   RefreshCw, Plus, Loader2, AlertCircle, X,
   BarChart2, ArrowUp, MessageCircle, Users,
 } from 'lucide-react';
-// MUI Slider removed — action bars now use Bootstrap-style progress bars matching Vembu
+import { Slider } from '@mui/material';
+import { styled } from '@mui/material/styles';
 import * as api from '../../api/client';
 // simple HTML tag stripper — avoids dompurify dep
 const stripHtml = (html) => (html || '').replace(/<[^>]*>/g, '').replace(/^-$/, '').trim();
@@ -146,59 +147,51 @@ function GoalProgressBar({ pct, goalMin, goalStretch, goalProgressType }) {
   );
 }
 
-/* ─── Action progress bar — matches vembu: progress-sm (12px) solid fill, CA- colors ── */
-// Vembu uses Bootstrap <Progress> for actions, NOT a slider. Same CA- color logic.
-// actionMin/Stretch tick marks match goal bar pattern.
-function ActionProgressBar({ pct, actionMin, actionStretch, actionProgressType, onCommit }) {
+/* ─── Action progress slider — MUI Slider, matches vembu (draggable pin thumb) ──── */
+// Color logic: CA-orange <50, CA-blue 50-79, CA-green >=80
+const makeSlider = (color) => styled(Slider)({
+  color,
+  height: 8,
+  padding: '13px 0',
+  '& .MuiSlider-thumb': {
+    height: 22,
+    width: 22,
+    backgroundColor: '#fff',
+    border: '2px solid currentColor',
+    boxShadow: '0 1px 4px rgba(0,0,0,.2)',
+    '&:focus,&:hover,&.Mui-active': { boxShadow: '0 0 0 6px rgba(0,0,0,.1)' },
+  },
+  '& .MuiSlider-track': { height: 8, borderRadius: 4 },
+  '& .MuiSlider-rail':  { height: 8, borderRadius: 4, opacity: 0.28 },
+  '& .MuiSlider-valueLabel': { fontSize: 11, background: color },
+});
+
+// Pre-build 3 color variants outside render — prevents remount on every render
+const SliderOrange = makeSlider('#fbac47');
+const SliderBlue   = makeSlider('#0197cc');
+const SliderGreen  = makeSlider('#0b6623');
+
+function ActionProgressBar({ pct, onCommit }) {
   const p = Math.min(100, Math.max(0, Number(pct) || 0));
-  // Same color logic as Vembu progressbgcolor
-  const fill = actionProgressType === 1
-    ? (p >= 80 ? '#b7274b' : p >= 50 ? '#fbac47' : '#0b6623')
-    : (p >= 80 ? '#0b6623' : p >= 50 ? '#0197cc' : '#fbac47');
+  const [localVal, setLocalVal] = useState(p);
 
-  const minPct     = actionMin     ? Math.min(100, Number(actionMin))     : null;
-  const stretchPct = actionStretch ? Math.min(99,  Number(actionStretch)) : null;
-  const greenPct   = (actionStretch && actionStretch > 100) ? (100 / actionStretch * 100) : null;
+  useEffect(() => {
+    setLocalVal(Math.min(100, Math.max(0, Number(pct) || 0)));
+  }, [pct]);
 
-  // Click on bar to quick-set progress (like Vembu's target popup interaction)
-  const handleClick = (e) => {
-    if (!onCommit) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clicked = Math.round(((e.clientX - rect.left) / rect.width) * 100);
-    const clamped = Math.min(100, Math.max(0, clicked));
-    onCommit(clamped / 100);
-  };
+  const PrettoSlider = localVal >= 80 ? SliderGreen : localVal >= 50 ? SliderBlue : SliderOrange;
 
   return (
-    // progress-sm = 12px height — matches vembu action row bar
-    <div
-      style={{
-        flex: 1, position: 'relative',
-        height: 12, background: '#e9ecef',
-        borderRadius: 4, margin: '0 8px',
-        overflow: 'visible', cursor: 'pointer',
-      }}
-      onClick={handleClick}
-      title={`${p.toFixed(1)}% — click to update`}
-    >
-      <div style={{
-        width: `${p}%`, height: '100%',
-        background: fill, borderRadius: 4,
-        transition: 'width .3s',
-        minWidth: p > 0 ? 4 : 0,
-      }} />
-      {/* red tick = min */}
-      {minPct !== null && (
-        <span style={{ position: 'absolute', left: `${minPct}%`, top: 0, width: 4, height: '100%', background: 'red', cursor: 'pointer', borderRadius: 2 }} />
-      )}
-      {/* purple tick = stretch */}
-      {stretchPct !== null && (
-        <span style={{ position: 'absolute', left: `${stretchPct}%`, top: 0, width: 4, height: '100%', background: 'purple', cursor: 'pointer', borderRadius: 2, zIndex: 1 }} />
-      )}
-      {/* green tick = 100% mark when stretch > 100 */}
-      {greenPct !== null && (
-        <span style={{ position: 'absolute', left: `${greenPct}%`, top: 0, width: 4, height: '100%', background: '#0b6623', cursor: 'pointer', borderRadius: 2, zIndex: 1 }} />
-      )}
+    <div style={{ flex: 1, padding: '0 8px', display: 'flex', alignItems: 'center' }}>
+      <PrettoSlider
+        value={localVal}
+        valueLabelDisplay="auto"
+        onChange={(_, val) => setLocalVal(val)}
+        onChangeCommitted={(_, val) => {
+          setLocalVal(val);
+          onCommit && onCommit(val / 100);
+        }}
+      />
     </div>
   );
 }
@@ -473,13 +466,10 @@ function ActionRow({ action, themeColor, onSliderCommit, onChartClick, onDecisio
         </div>
       </td>
 
-      {/* Action progress bar — Bootstrap-style solid fill, 12px height, click-to-update */}
+      {/* Action slider — MUI draggable pin, saves on release, color by % band */}
       <td style={{ padding: '0 4px' }}>
         <ActionProgressBar
           pct={localPct}
-          actionMin={action.actionMin}
-          actionStretch={action.actionStretch}
-          actionProgressType={action.actionProgressType}
           onCommit={(dec) => {
             const newPct = Math.round(dec * 100);
             setLocalPct(newPct);
